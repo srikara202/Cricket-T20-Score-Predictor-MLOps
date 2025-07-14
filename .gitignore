@@ -1,3 +1,11 @@
+creds.txt
+notebooks/t20s-full-dataset/
+local_s3/
+notebooks/dataset_level1.pkl
+notebooks/catboost_info/
+notebooks/model_dir/
+notebooks/xgb_cv_model/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,7 +1,6 @@
 import os
 import unittest
 
-import mlflow
 import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
 import pandas as pd
@@ -20,10 +19,11 @@ class TestCricketScorePredictor(unittest.TestCase):
         os.environ["MLFLOW_TRACKING_USERNAME"] = token
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
-        mlflow.set_tracking_uri(
+        mlflow_tracking_uri = (
             "https://dagshub.com/"
             "srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
         )
+        mlflow.set_tracking_uri(mlflow_tracking_uri)
 
         # ─── resolve latest version by alias prefix ────────────────────
         cls.model_name = "my_model"
@@ -32,7 +32,6 @@ class TestCricketScorePredictor(unittest.TestCase):
             cls.model_name,
             cls.alias_prefix
         )
-
         cls.model_uri = f"models:/{cls.model_name}/{cls.model_version}"
         cls.model = mlflow.pyfunc.load_model(cls.model_uri)
 
@@ -42,7 +41,7 @@ class TestCricketScorePredictor(unittest.TestCase):
         cls.y_test = df["total_runs"]
 
     @staticmethod
-    def get_latest_model_version(model_name: str, alias_prefix: str):
+    def get_latest_model_version(model_name: str, alias_prefix: str) -> str:
         """
         Fetch the most‐recent model version whose aliases list
         contains any entry starting with alias_prefix
@@ -53,11 +52,16 @@ class TestCricketScorePredictor(unittest.TestCase):
         # 1) Retrieve all versions for this model
         all_versions = client.search_model_versions(f"name = '{model_name}'")
 
-        # 2) Keep only those with an alias that starts with alias_prefix
-        candidates = [
-            mv for mv in all_versions
-            if any(a[0].startswith(alias_prefix) for a in mv.aliases)
-        ]
+        # 2) For each version, list its aliases and keep ones matching our prefix
+        candidates = []
+        for mv in all_versions:
+            alias_objs = client.list_model_version_aliases(
+                name=model_name,
+                version=mv.version
+            )
+            aliases = [a.alias for a in alias_objs]
+            if any(a.startswith(alias_prefix) for a in aliases):
+                candidates.append(mv)
 
         if not candidates:
             raise ValueError(

@@ -116,7 +116,7 @@ opentelemetry-sdk==1.26.0
 opentelemetry-semantic-conventions==0.47b0
 orjson==3.10.6
 packaging==24.1
-pandas==2.2.2
+pandas
 pathspec==0.12.1
 pathvalidate==3.0.0
 pillow==10.4.0

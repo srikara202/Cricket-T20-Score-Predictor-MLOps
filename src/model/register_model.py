@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-Register a model run in MLflow and assign it a unique 'staging*' alias.
+Register an MLflow model version and tag it as 'staging'.
 """
 
 import json
 import os
-import random
 import warnings
 import logging
 
 import mlflow
-from mlflow import MlflowClient
+from mlflow.tracking import MlflowClient
 
 # suppress harmless warnings
 warnings.simplefilter("ignore", UserWarning)
@@ -18,7 +17,7 @@ warnings.filterwarnings("ignore")
 
 
 def load_model_info(file_path: str) -> dict:
-    """Load the model info from a JSON file."""
+    """Load the model info (run_id + artifact path) from JSON."""
     try:
         with open(file_path, "r") as f:
             info = json.load(f)
@@ -33,24 +32,23 @@ def load_model_info(file_path: str) -> dict:
 
 
 def register_model(model_name: str, model_info: dict):
-    """Register the model to MLflow Model Registry and alias it as staging."""
-    # build the MLflow URI for the artifact you saved in your run
-    model_uri = f"runs:/{model_info['run_id']}/{model_info['model_path']}"
+    """Register the model to MLflow Model Registry and tag it 'staging'."""
     client = MlflowClient()
+    model_uri = f"runs:/{model_info['run_id']}/{model_info['model_path']}"
 
     # 1) register the new version
     mv = mlflow.register_model(model_uri=model_uri, name=model_name)
     logging.debug("Registered model %s version %s", model_name, mv.version)
 
-    # 2) create a unique staging alias, e.g. staging1234567890
-    alias = f"staging{random.randint(10**9, 10**10 - 1)}"
-    client.set_registered_model_alias(
+    # 2) tag it as staging
+    client.set_model_version_tag(
         name=model_name,
-        alias=alias,
         version=mv.version,
+        key="stage",
+        value="staging"
     )
-    logging.debug("Assigned alias '%s' → version %s", alias, mv.version)
-    print(f"✅ Registered '{model_name}' v{mv.version} with alias '{alias}'")
+    logging.debug("Tagged model %s version %s with stage=staging", model_name, mv.version)
+    print(f"✅ Registered '{model_name}' v{mv.version} and tagged stage=staging")
 
 
 def main():
@@ -62,6 +60,7 @@ def main():
     os.environ["MLFLOW_TRACKING_USERNAME"] = token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
+    # point at your DagsHub MLflow registry
     uri = "https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
     mlflow.set_tracking_uri(uri)
 

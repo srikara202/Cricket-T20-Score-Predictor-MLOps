@@ -19,18 +19,21 @@ class TestCricketScorePredictor(unittest.TestCase):
         os.environ["MLFLOW_TRACKING_USERNAME"] = token
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
+        # Point at your registry
         mlflow.set_tracking_uri(
-            "https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
+            "https://dagshub.com/"
+            "srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
         )
 
-        # ─── resolve latest version by alias prefix ─────────────────────
-        cls.model_name     = "my_model"
-        cls.alias_prefix   = "staging"
-        cls.model_version  = cls.get_latest_model_version(
-            cls.model_name, cls.alias_prefix
+        # ─── resolve latest version by tag ───────────────────────────────
+        cls.model_name = "my_model"
+        cls.model_version = cls.get_latest_model_version(
+            cls.model_name,
+            stage="staging"   # ← look for stage=staging tag
         )
-        cls.model_uri      = f"models:/{cls.model_name}/{cls.model_version}"
-        cls.model          = mlflow.pyfunc.load_model(cls.model_uri)
+
+        cls.model_uri = f"models:/{cls.model_name}/{cls.model_version}"
+        cls.model = mlflow.pyfunc.load_model(cls.model_uri)
 
         # ─── load holdout data ──────────────────────────────────────────
         df = pd.read_csv("data/processed/test_final.csv")
@@ -38,28 +41,27 @@ class TestCricketScorePredictor(unittest.TestCase):
         cls.y_test = df["total_runs"]
 
     @staticmethod
-    def get_latest_model_version(model_name: str, alias_prefix: str) -> str:
+    def get_latest_model_version(model_name: str, stage: str) -> str:
         """
-        Fetch the most‐recent model version whose aliases list contains
-        at least one entry starting with alias_prefix.
+        Fetch the most‐recent model version that has tag 'stage' == stage.
         """
         client = mlflow.tracking.MlflowClient()
         all_versions = client.search_model_versions(f"name = '{model_name}'")
-        # keep versions with any alias that starts with our prefix
+
+        # filter by our stage‐tag
         candidates = [
             mv for mv in all_versions
-            if any(a.startswith(alias_prefix) for a in mv.aliases)
+            if mv.tags.get("stage") == stage
         ]
         if not candidates:
-            raise ValueError(
-                f"No versions found for model='{model_name}' with alias starting '{alias_prefix}'"
-            )
-        # pick the one most recently updated
+            raise ValueError(f"No versions found for model='{model_name}' with stage='{stage}'")
+
+        # newest first
         candidates.sort(key=lambda mv: mv.last_updated_timestamp, reverse=True)
         return candidates[0].version
 
     def test_model_loaded(self):
-        """Model should load via alias without error."""
+        """Model should load via its stage tag without error."""
         self.assertIsNotNone(self.model)
 
     def test_signature_matches(self):
@@ -78,7 +80,7 @@ class TestCricketScorePredictor(unittest.TestCase):
         mae = mean_absolute_error(self.y_test, preds)
         r2  = r2_score(self.y_test, preds)
 
-        # adjust these to whatever makes sense for your data
+        # adjust these thresholds to suit your data
         self.assertLessEqual(mse, 300, f"MSE too high: {mse:.1f}")
         self.assertLessEqual(mae, 15,  f"MAE too high: {mae:.1f}")
         self.assertGreaterEqual(r2,  0.50, f"R² too low: {r2:.2f}")

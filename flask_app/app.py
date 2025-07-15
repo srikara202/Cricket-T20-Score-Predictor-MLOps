@@ -9,8 +9,7 @@ import dagshub
 from prometheus_client import Counter, Histogram, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 
 # ─── MLflow / DagsHub setup ─────────────────────────────────────────────────────
-# token = os.getenv("CAPSTONE_TEST")
-token = "0a498e8fabb7b281830e2a4d83a92fd4955e0f4f"
+token = os.getenv("CAPSTONE_TEST")
 if not token:
     raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
 os.environ["MLFLOW_TRACKING_USERNAME"] = token

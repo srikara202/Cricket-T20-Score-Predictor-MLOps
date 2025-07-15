@@ -242,7 +242,7 @@ def main():
         test_size = 0.2
         
         df = load_yaml_directory(data_url='notebooks/t20s/')
-        # s3 = s3_connection.s3_operations("t20s", "AKIAZVMTVIGCAAUEGPHS", "S/IXs6fVXYLh3Ke8XM/iIYhT21/qE92mqCEM/MKe")
+        # s3 = s3_connection.s3_operations("t20s", "aws_access_key", "aws_secret_access_key")
         # df = s3.fetch_yaml_folder_from_s3("t20s")
 
 

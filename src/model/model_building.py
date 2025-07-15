@@ -1,6 +1,7 @@
 import pandas as pd
 import pickle
 import yaml
+from pathlib import Path
 from src.logger import logging
 from time import time
 from sklearn.compose import ColumnTransformer
@@ -104,6 +105,8 @@ def build_and_train_model(X_train, y_train):
 def save_model(model, file_path: str) -> None:
     """Save the trained model to a file."""
     try:
+        Path("models").mkdir(exist_ok=True)
+        file_path = 'models/' + file_path
         with open(file_path, 'wb') as file:
             pickle.dump(model, file)
         logging.info('Model saved to %s', file_path)
@@ -123,9 +126,9 @@ def main():
         X_train = train_data.drop(columns=['total_runs'])
         y_train = train_data['total_runs']
 
-        clf = build_and_train_model(X_train, y_train)
+        xgbr = build_and_train_model(X_train, y_train)
         
-        save_model(clf, 'models/model.pkl')
+        save_model(xgbr, 'model.pkl')
     except Exception as e:
         logging.error('Failed to complete the model building process: %s', e)
         print(f"Error: {e}")

@@ -56,7 +56,7 @@ class TestCricketScorePredictor(unittest.TestCase):
         # 2) Keep only those with an alias that starts with alias_prefix
         candidates = [
             mv for mv in all_versions
-            if any(a.startswith(alias_prefix) for a in mv.aliases)
+            if any(a.startswith(alias_prefix) for str(a) in mv.aliases)
         ]
 
         if not candidates:

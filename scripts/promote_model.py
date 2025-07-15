@@ -1,10 +1,14 @@
-# promote model
+#!/usr/bin/env python3
+"""
+Promote an MLflow model version from the 'staging*' alias to the 'production' alias.
+"""
 
 import os
 import mlflow
+from mlflow.exceptions import RestException
 
-def promote_model():
-    # Set up DagsHub credentials for MLflow tracking
+def main():
+    # 1. Read your DagsHub token from env
     dagshub_token = os.getenv("CAPSTONE_TEST")
     if not dagshub_token:
         raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
@@ -12,35 +16,50 @@ def promote_model():
     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
+    # 2. Point MLflow at your DagsHub registry
     dagshub_url = "https://dagshub.com"
     repo_owner = "srikara202"
     repo_name = "Cricket-T20-Score-Predictor-MLOps"
-
-    # Set up MLflow tracking URI
-    mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+    tracking_uri = f"{dagshub_url}/{repo_owner}/{repo_name}.mlflow"
+    mlflow.set_tracking_uri(tracking_uri)
 
     client = mlflow.MlflowClient()
-
     model_name = "my_model"
-    # Get the latest version in staging
-    latest_version_staging = client.get_latest_versions(model_name)[0].version
+    staging_prefix = "staging"
+    production_alias = "production"
 
-    # Archive the current production model
-    prod_versions = client.get_latest_versions(model_name)
-    for version in prod_versions:
-        client.transition_model_version_stage(
-            name=model_name,
-            version=version.version,
-            stage="Archived"
-        )
+    # 3. Find all versions whose aliases start with "staging"
+    all_versions = client.search_model_versions(f"name='{model_name}'")
+    staging_candidates = [
+        mv for mv in all_versions
+        if any(alias.startswith(staging_prefix) for alias in mv.aliases)
+    ]
+    if not staging_candidates:
+        raise ValueError(f"No model version has an alias starting with '{staging_prefix}'")
 
-    # Promote the new model to production
-    client.transition_model_version_stage(
+    # pick the highest version number among them
+    to_promote = max(staging_candidates, key=lambda mv: int(mv.version)).version
+
+    # 4. Strip the "production" alias off any version that has it
+    for mv in all_versions:
+        if production_alias in mv.aliases:
+            try:
+                client.delete_model_version_alias(
+                    name=model_name,
+                    version=mv.version,
+                    alias=production_alias,
+                )
+                print(f"Removed alias '{production_alias}' from version {mv.version}")
+            except RestException as e:
+                print(f"Warning: could not remove alias '{production_alias}' from v{mv.version}: {e}")
+
+    # 5. Create the new "production" alias on your chosen staging candidate
+    client.create_model_version_alias(
         name=model_name,
-        version=latest_version_staging,
-        stage="Production"
+        version=to_promote,
+        alias=production_alias,
     )
-    print(f"Model version {latest_version_staging} promoted to Production")
+    print(f"✅ Model version {to_promote} is now aliased '{production_alias}'")
 
 if __name__ == "__main__":
-    promote_model()
+    main()

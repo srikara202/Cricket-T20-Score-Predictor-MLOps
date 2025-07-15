@@ -6,7 +6,7 @@ import logging
 from src.logger import logging
 import os
 import dagshub
-
+import random
 import warnings
 warnings.simplefilter("ignore", UserWarning)
 warnings.filterwarnings("ignore")
@@ -57,13 +57,13 @@ def register_model(model_name: str, model_info: dict):
         
         # Register the model
         model_version = mlflow.register_model(model_uri, model_name)
-        
+        r = str(random.randint(10**9, (10**10) - 1))
         # Transition the model to "Staging" stage
         client = mlflow.tracking.MlflowClient()
-        client.transition_model_version_stage(
+        client.create_model_version_alias(
             name=model_name,
             version=model_version.version,
-            stage="Staging"
+            alias="staging"+r
         )
         
         logging.debug(f'Model {model_name} version {model_version.version} registered and transitioned to Staging.')

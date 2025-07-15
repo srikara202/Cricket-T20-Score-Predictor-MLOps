@@ -31,7 +31,7 @@ def main():
     all_versions = client.search_model_versions(f"name = '{model_name}'")
     staging_versions = [
         mv for mv in all_versions
-        if any(alias.startswith(staging_prefix) for alias in mv.aliases)
+        if any(alias[0].startswith(staging_prefix) for alias in mv.aliases)
     ]
     if not staging_versions:
         raise ValueError(f"No model version has an alias starting with '{staging_prefix}'")

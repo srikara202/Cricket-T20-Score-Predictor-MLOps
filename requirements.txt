@@ -150,7 +150,7 @@ ruamel.yaml.clib==0.2.8
 s3fs==2024.6.1
 s3transfer==0.10.2
 scikit-learn==1.5.1
-scipy==1.14.0
+scipy
 scmrepo==3.3.6
 semver==3.0.2
 shellingham==1.5.4

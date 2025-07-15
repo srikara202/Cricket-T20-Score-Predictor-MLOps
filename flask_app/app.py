@@ -1,4 +1,4 @@
-# flask_app/app.py
+#!/usr/bin/env python3
 import os
 import time
 import logging
@@ -8,22 +8,27 @@ import mlflow
 import dagshub
 from prometheus_client import Counter, Histogram, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 
-# ─── MLflow / DagsHub setup ─────────────────────────────────────────────────────
-token = os.getenv("CAPSTONE_TEST")
-if not token:
+# ─────────────────────────────────────────────────────────────────────────────
+# MLflow + DagsHub setup
+# ─────────────────────────────────────────────────────────────────────────────
+dagshub_token = os.getenv("CAPSTONE_TEST")
+if not dagshub_token:
     raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
-os.environ["MLFLOW_TRACKING_USERNAME"] = token
-os.environ["MLFLOW_TRACKING_PASSWORD"] = token
+
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
 dagshub_url = "https://dagshub.com"
 repo_owner = "srikara202"
 repo_name = "Cricket-T20-Score-Predictor-MLOps"
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
-# ────────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Load model
+# ─────────────────────────────────────────────────────────────────────────────
 def get_latest_model_version(model_name: str) -> str:
     client = mlflow.MlflowClient()
-    versions = client.get_latest_versions(model_name)  # still fine for you
+    versions = client.get_latest_versions(model_name)
     return versions[0].version if versions else None
 
 MODEL_NAME    = "my_model"
@@ -37,12 +42,16 @@ logging.basicConfig(
 logging.info("Loading model from %s", MODEL_URI)
 model = mlflow.pyfunc.load_model(MODEL_URI)
 
-# ─── Prometheus metrics ────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Prometheus metrics
+# ─────────────────────────────────────────────────────────────────────────────
 registry = CollectorRegistry()
 REQUEST_COUNT   = Counter("app_request_count",   "Total HTTP requests", ["method","endpoint"], registry=registry)
 REQUEST_LATENCY = Histogram("app_request_latency_seconds", "Request latency", ["endpoint"], registry=registry)
 
-# ─── Flask setup ───────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Flask app
+# ─────────────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
 TEAMS = [
@@ -84,17 +93,26 @@ def predict():
     REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
     start = time.time()
 
-    # if JSON, handle as API call
+    # JSON-based API
     if request.is_json:
         payload = request.get_json()
-        # expect these keys:
-        current_score = payload["current_score"]
-        balls_left    = payload["balls_left"]
-        wickets_left  = payload["wickets_left"]
-        crr           = payload["crr"]
-        last_five     = payload["last_five"]
+        # fill in missing categories with defaults
+        batting  = payload.get("batting_team", TEAMS[0])
+        bowling  = payload.get("bowling_team", TEAMS[1] if TEAMS[1] != batting else TEAMS[0])
+        city     = payload.get("city", CITIES[0])
+        try:
+            current_score = payload["current_score"]
+            balls_left    = payload["balls_left"]
+            wickets_left  = payload["wickets_left"]
+            crr           = payload["crr"]
+            last_five     = payload["last_five"]
+        except KeyError as e:
+            return jsonify({"error": f"Missing field {e}"}), 400
 
-        X = pd.DataFrame([{
+        input_df = pd.DataFrame([{
+            "batting_team":  batting,
+            "bowling_team":  bowling,
+            "city":          city,
             "current_score": current_score,
             "balls_left":    balls_left,
             "wickets_left":  wickets_left,
@@ -102,16 +120,14 @@ def predict():
             "last_five":     last_five
         }])
         try:
-            pred = model.predict(X)[0]
-            val  = float(pred)
+            pred = model.predict(input_df)[0]
+            score = int(round(pred))
+            return jsonify({"predicted_score": score})
         except Exception as e:
             logging.exception("Prediction error (JSON): %s", e)
             return jsonify({"error": str(e)}), 500
 
-        REQUEST_LATENCY.labels(endpoint="/predict").observe(time.time() - start)
-        return jsonify({"predicted_score": val})
-
-    # otherwise, treat it as form + template
+    # form-based flow
     batting_team  = request.form.get("batting_team")
     bowling_team  = request.form.get("bowling_team")
     city          = request.form.get("city")
@@ -124,7 +140,7 @@ def predict():
         balls_bowled = int(overs_done * 6)
         balls_left   = max(120 - balls_bowled, 0)
         wickets_left = max(10 - wickets_out, 0)
-        crr          = round(current_score / overs_done, 2) if overs_done > 0 else 0.0
+        crr = round(current_score / overs_done, 2) if overs_done > 0 else 0.0
 
         input_df = pd.DataFrame([{
             "batting_team":  batting_team,
@@ -136,12 +152,10 @@ def predict():
             "crr":           crr,
             "last_five":     last_five
         }])
-
-        pred       = model.predict(input_df)[0]
-        prediction = int(round(pred))
-        result     = prediction
+        pred = model.predict(input_df)[0]
+        result = int(round(pred))
     except Exception as e:
-        logging.exception("Prediction error (form): %s", e)
+        logging.exception("Prediction error: %s", e)
         result = f"Error: {e}"
 
     context = dict(

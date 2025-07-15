@@ -1,8 +1,8 @@
 import os
 import unittest
 
+import mlflow
 import mlflow.pyfunc
-from mlflow.tracking import MlflowClient
 import pandas as pd
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
@@ -19,21 +19,18 @@ class TestCricketScorePredictor(unittest.TestCase):
         os.environ["MLFLOW_TRACKING_USERNAME"] = token
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
-        mlflow_tracking_uri = (
-            "https://dagshub.com/"
-            "srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
+        mlflow.set_tracking_uri(
+            "https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
         )
-        mlflow.set_tracking_uri(mlflow_tracking_uri)
 
-        # ─── resolve latest version by alias prefix ────────────────────
-        cls.model_name = "my_model"
-        cls.alias_prefix = "staging"
-        cls.model_version = cls.get_latest_model_version(
-            cls.model_name,
-            cls.alias_prefix
+        # ─── resolve latest version by alias prefix ─────────────────────
+        cls.model_name     = "my_model"
+        cls.alias_prefix   = "staging"
+        cls.model_version  = cls.get_latest_model_version(
+            cls.model_name, cls.alias_prefix
         )
-        cls.model_uri = f"models:/{cls.model_name}/{cls.model_version}"
-        cls.model = mlflow.pyfunc.load_model(cls.model_uri)
+        cls.model_uri      = f"models:/{cls.model_name}/{cls.model_version}"
+        cls.model          = mlflow.pyfunc.load_model(cls.model_uri)
 
         # ─── load holdout data ──────────────────────────────────────────
         df = pd.read_csv("data/processed/test_final.csv")
@@ -43,33 +40,21 @@ class TestCricketScorePredictor(unittest.TestCase):
     @staticmethod
     def get_latest_model_version(model_name: str, alias_prefix: str) -> str:
         """
-        Fetch the most‐recent model version whose aliases list
-        contains any entry starting with alias_prefix
-        (e.g. "staging123456789").
+        Fetch the most‐recent model version whose aliases list contains
+        at least one entry starting with alias_prefix.
         """
-        client = MlflowClient()
-
-        # 1) Retrieve all versions for this model
+        client = mlflow.tracking.MlflowClient()
         all_versions = client.search_model_versions(f"name = '{model_name}'")
-
-        # 2) For each version, list its aliases and keep ones matching our prefix
-        candidates = []
-        for mv in all_versions:
-            alias_objs = client.list_model_version_aliases(
-                name=model_name,
-                version=mv.version
-            )
-            aliases = [a.alias for a in alias_objs]
-            if any(a.startswith(alias_prefix) for a in aliases):
-                candidates.append(mv)
-
+        # keep versions with any alias that starts with our prefix
+        candidates = [
+            mv for mv in all_versions
+            if any(a.startswith(alias_prefix) for a in mv.aliases)
+        ]
         if not candidates:
             raise ValueError(
-                f"No versions found for model='{model_name}' "
-                f"with alias starting '{alias_prefix}'"
+                f"No versions found for model='{model_name}' with alias starting '{alias_prefix}'"
             )
-
-        # 3) Sort by last_updated_timestamp descending and pick the newest
+        # pick the one most recently updated
         candidates.sort(key=lambda mv: mv.last_updated_timestamp, reverse=True)
         return candidates[0].version
 
@@ -93,7 +78,7 @@ class TestCricketScorePredictor(unittest.TestCase):
         mae = mean_absolute_error(self.y_test, preds)
         r2  = r2_score(self.y_test, preds)
 
-        # adjust these thresholds as appropriate for your data
+        # adjust these to whatever makes sense for your data
         self.assertLessEqual(mse, 300, f"MSE too high: {mse:.1f}")
         self.assertLessEqual(mae, 15,  f"MAE too high: {mae:.1f}")
         self.assertGreaterEqual(r2,  0.50, f"R² too low: {r2:.2f}")

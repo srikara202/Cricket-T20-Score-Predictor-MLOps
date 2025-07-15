@@ -1,0 +1,8 @@
+# params.yaml
+feature_engineering:
+  test_size: 0.20
+
+model_building:
+  n_estimators: 1000
+  learning_rate: 0.2
+  max_depth: 12

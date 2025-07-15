@@ -20,6 +20,9 @@ class FlaskAppTests(unittest.TestCase):
         """POST /predict should return a JSON with a numeric 'predicted_score'."""
         # craft a minimal valid payload
         payload = {
+            "batting_team": "India",
+            "bowling_team": "England",
+            "City": "London",
             "current_score": 80,
             "balls_left": 60,
             "wickets_left": 6,

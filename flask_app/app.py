@@ -1,40 +1,29 @@
-# app.py
+# flask_app/app.py
 import os
 import time
 import logging
 import pandas as pd
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import mlflow
 import dagshub
 from prometheus_client import Counter, Histogram, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Local DagsHub + MLflow setup
-# ─────────────────────────────────────────────────────────────────────────────
-# mlflow.set_tracking_uri("https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow")
-# dagshub.init(repo_owner="srikara202",repo_name="Cricket-T20-Score-Predictor-MLOps",mlflow=True)
-# -------------------------------------------------------------------------------------
-# Below code block is for production use
-# -------------------------------------------------------------------------------------
-# Set up DagsHub credentials for MLflow tracking
-dagshub_token = os.getenv("CAPSTONE_TEST")
-if not dagshub_token:
+# ─── MLflow / DagsHub setup ─────────────────────────────────────────────────────
+token = os.getenv("CAPSTONE_TEST")
+if not token:
     raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
-
-os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+os.environ["MLFLOW_TRACKING_USERNAME"] = token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
 dagshub_url = "https://dagshub.com"
 repo_owner = "srikara202"
 repo_name = "Cricket-T20-Score-Predictor-MLOps"
-# Set up MLflow tracking URI
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
-# -------------------------------------------------------------------------------------
-
+# ────────────────────────────────────────────────────────────────────────────────
 
 def get_latest_model_version(model_name: str) -> str:
     client = mlflow.MlflowClient()
-    versions = client.get_latest_versions(model_name)
+    versions = client.get_latest_versions(model_name)  # still fine for you
     return versions[0].version if versions else None
 
 MODEL_NAME    = "my_model"
@@ -48,16 +37,12 @@ logging.basicConfig(
 logging.info("Loading model from %s", MODEL_URI)
 model = mlflow.pyfunc.load_model(MODEL_URI)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Prometheus metrics
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── Prometheus metrics ────────────────────────────────────────────────────────
 registry = CollectorRegistry()
 REQUEST_COUNT   = Counter("app_request_count",   "Total HTTP requests", ["method","endpoint"], registry=registry)
 REQUEST_LATENCY = Histogram("app_request_latency_seconds", "Request latency", ["endpoint"], registry=registry)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Flask setup
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── Flask setup ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
 TEAMS = [
@@ -78,8 +63,6 @@ CITIES = [
 def home():
     REQUEST_COUNT.labels(method="GET", endpoint="/").inc()
     start = time.time()
-
-    # On GET, no prior inputs or result
     context = dict(
         teams=sorted(TEAMS),
         cities=sorted(CITIES),
@@ -92,16 +75,43 @@ def home():
         wickets=None,
         last_five=None,
     )
-    response = render_template("index.html", **context)
+    resp = render_template("index.html", **context)
     REQUEST_LATENCY.labels(endpoint="/").observe(time.time() - start)
-    return response
+    return resp
 
 @app.route("/predict", methods=["POST"])
 def predict():
     REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
     start = time.time()
 
-    # Pull everything out of the form    
+    # if JSON, handle as API call
+    if request.is_json:
+        payload = request.get_json()
+        # expect these keys:
+        current_score = payload["current_score"]
+        balls_left    = payload["balls_left"]
+        wickets_left  = payload["wickets_left"]
+        crr           = payload["crr"]
+        last_five     = payload["last_five"]
+
+        X = pd.DataFrame([{
+            "current_score": current_score,
+            "balls_left":    balls_left,
+            "wickets_left":  wickets_left,
+            "crr":           crr,
+            "last_five":     last_five
+        }])
+        try:
+            pred = model.predict(X)[0]
+            val  = float(pred)
+        except Exception as e:
+            logging.exception("Prediction error (JSON): %s", e)
+            return jsonify({"error": str(e)}), 500
+
+        REQUEST_LATENCY.labels(endpoint="/predict").observe(time.time() - start)
+        return jsonify({"predicted_score": val})
+
+    # otherwise, treat it as form + template
     batting_team  = request.form.get("batting_team")
     bowling_team  = request.form.get("bowling_team")
     city          = request.form.get("city")
@@ -111,11 +121,10 @@ def predict():
     last_five     = request.form.get("last_five", type=int)
 
     try:
-        # Derived features
         balls_bowled = int(overs_done * 6)
         balls_left   = max(120 - balls_bowled, 0)
         wickets_left = max(10 - wickets_out, 0)
-        crr = round(current_score / overs_done, 2) if overs_done > 0 else 0.0
+        crr          = round(current_score / overs_done, 2) if overs_done > 0 else 0.0
 
         input_df = pd.DataFrame([{
             "batting_team":  batting_team,
@@ -128,15 +137,13 @@ def predict():
             "last_five":     last_five
         }])
 
-        pred = model.predict(input_df)[0]
+        pred       = model.predict(input_df)[0]
         prediction = int(round(pred))
-        result = prediction
-
+        result     = prediction
     except Exception as e:
-        logging.exception("Prediction error: %s", e)
+        logging.exception("Prediction error (form): %s", e)
         result = f"Error: {e}"
 
-    # Render back **with** all inputs and result so the form stays filled
     context = dict(
         teams=sorted(TEAMS),
         cities=sorted(CITIES),

@@ -1,9 +1,9 @@
-<!-- templates/index.html -->
+<!-- flask_app/templates/index.html -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Cricket Score Predictor</title>
+    <title>T20 Score Predictor</title>
     <style>
       body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1rem; }
       label, select, input { display: block; width: 100%; margin-bottom: .5rem; }
@@ -14,7 +14,7 @@
     </style>
   </head>
   <body>
-    <h1>Cricket Score Predictor</h1>
+    <h1>T20 Score Predictor</h1>
     <form action="/predict" method="post">
       <div class="row">
         <div class="col">
@@ -22,10 +22,7 @@
           <select name="batting_team" required>
             <option value="">-- choose --</option>
             {% for t in teams %}
-              <option value="{{t}}"
-                {% if t==batting_team %}selected{% endif %}>
-                {{t}}
-              </option>
+              <option value="{{t}}" {% if t==batting_team %}selected{% endif %}>{{t}}</option>
             {% endfor %}
           </select>
         </div>
@@ -34,10 +31,7 @@
           <select name="bowling_team" required>
             <option value="">-- choose --</option>
             {% for t in teams %}
-              <option value="{{t}}"
-                {% if t==bowling_team %}selected{% endif %}>
-                {{t}}
-              </option>
+              <option value="{{t}}" {% if t==bowling_team %}selected{% endif %}>{{t}}</option>
             {% endfor %}
           </select>
         </div>
@@ -47,45 +41,34 @@
       <select name="city" required>
         <option value="">-- choose --</option>
         {% for c in cities %}
-          <option value="{{c}}"
-            {% if c==city %}selected{% endif %}>
-            {{c}}
-          </option>
+          <option value="{{c}}" {% if c==city %}selected{% endif %}>{{c}}</option>
         {% endfor %}
       </select>
 
       <div class="row">
         <div class="col">
           <label>Current Score</label>
-          <input type="number" name="current_score"
-                 value="{{ current_score or '' }}" required>
+          <input type="number" name="current_score" value="{{ current_score or '' }}" required>
         </div>
         <div class="col">
           <label>Overs Done</label>
-          <input type="number" step="0.1" name="overs"
-                 value="{{ overs or '' }}" required>
+          <input type="number" step="0.1" name="overs" value="{{ overs or '' }}" required>
         </div>
         <div class="col">
           <label>Wickets Out</label>
-          <input type="number" name="wickets"
-                 value="{{ wickets or '' }}" required>
+          <input type="number" name="wickets" value="{{ wickets or '' }}" required>
         </div>
       </div>
 
       <label>Runs in Last 5 Overs</label>
-      <input type="number" name="last_five"
-             value="{{ last_five or '' }}" required>
+      <input type="number" name="last_five" value="{{ last_five or '' }}" required>
 
       <button type="submit">Predict Score</button>
     </form>
 
     {% if result is not none %}
       <div class="result">
-        {% if result is integer %}
-          Predicted Score: <strong>{{ result }}</strong>
-        {% else %}
-          {{ result }}
-        {% endif %}
+        Predicted Score: <strong>{{ result }}</strong>
       </div>
     {% endif %}
   </body>

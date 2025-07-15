@@ -81,7 +81,13 @@ def engineer_and_split(
 
         # 3. Filter to only cities with >600 deliveries
         counts = data['city'].value_counts()
+
+
         eligible = counts[counts > 600].index.tolist()
+        with open("eligible_cities.txt", "w") as output:
+            output.write(str(eligible))
+        logging.info("saved eligible cities")
+        
         before = len(data)
         data = data[data['city'].isin(eligible)]
         logging.info(

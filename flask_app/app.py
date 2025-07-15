@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import ast
 import time
 import logging
 import pandas as pd
@@ -58,15 +59,25 @@ TEAMS = [
     "Australia","India","Bangladesh","New Zealand","South Africa",
     "England","West Indies","Afghanistan","Pakistan","Sri Lanka"
 ]
-CITIES = [
-    "Colombo","Mirpur","Johannesburg","Dubai","Auckland","Cape Town",
-    "London","Pallekele","Barbados","Sydney","Melbourne","Durban",
-    "St Lucia","Wellington","Lauderhill","Hamilton","Centurion",
-    "Manchester","Abu Dhabi","Mumbai","Nottingham","Southampton",
-    "Mount Maunganui","Chittagong","Kolkata","Lahore","Delhi",
-    "Nagpur","Chandigarh","Adelaide","Bangalore","St Kitts",
-    "Cardiff","Christchurch","Trinidad"
-]
+
+file_path = 'eligible_cities.txt'
+my_list = []
+
+with open(file_path, 'r') as file:
+    for line in file:
+        my_list.append(line.strip()) # .strip() removes leading/trailing whitespace, including newline characters
+
+CITIES = ast.literal_eval(my_list[0])
+
+# CITIES = [
+#     "Colombo","Mirpur","Johannesburg","Dubai","Auckland","Cape Town",
+#     "London","Pallekele","Barbados","Sydney","Melbourne","Durban",
+#     "St Lucia","Wellington","Lauderhill","Hamilton","Centurion",
+#     "Manchester","Abu Dhabi","Mumbai","Nottingham","Southampton",
+#     "Mount Maunganui","Chittagong","Kolkata","Lahore","Delhi",
+#     "Nagpur","Chandigarh","Adelaide","Bangalore","St Kitts",
+#     "Cardiff","Christchurch","Trinidad"
+# ]
 
 @app.route("/", methods=["GET"])
 def home():

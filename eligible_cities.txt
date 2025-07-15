@@ -1,0 +1,1 @@
+['Johannesburg', 'London', 'Barbados', 'St Lucia', 'Cape Town', 'Nottingham', '', 'Durban', 'Auckland']

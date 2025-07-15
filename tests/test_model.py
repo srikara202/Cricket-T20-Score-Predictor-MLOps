@@ -1,10 +1,11 @@
 import os
 import unittest
 
+import mlflow
 import mlflow.pyfunc
+from mlflow.tracking import MlflowClient
 import pandas as pd
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-from mlflow import MlflowClient
 
 
 class TestCricketScorePredictor(unittest.TestCase):
@@ -41,39 +42,45 @@ class TestCricketScorePredictor(unittest.TestCase):
         cls.y_test = df["total_runs"]
 
     @staticmethod
-    def get_latest_model_version(model_name: str, alias_prefix: str) -> str:
+    def get_latest_model_version(model_name: str, alias_prefix: str):
         """
-        Fetch the most‐recent model version that has ANY alias
-        starting with alias_prefix (e.g. "staging12345").
+        Fetch the most‐recent model version whose aliases list
+        contains any entry starting with alias_prefix
+        (e.g. "staging123456789").
         """
         client = MlflowClient()
-        # fetch all versions for this model
+
+        # 1) Retrieve all versions for this model
         all_versions = client.search_model_versions(f"name = '{model_name}'")
 
-        # filter those whose aliases list contains an alias that starts with the prefix
+        # 2) Keep only those with an alias that starts with alias_prefix
         candidates = [
             mv for mv in all_versions
-            if any(alias.startswith(alias_prefix) for alias in mv.aliases)
+            if any(a.startswith(alias_prefix) for a in mv.aliases)
         ]
-        if not candidates:
-            raise ValueError(f"No versions found for model='{model_name}' alias prefix='{alias_prefix}'")
 
-        # pick the one most recently updated
+        if not candidates:
+            raise ValueError(
+                f"No versions found for model='{model_name}' "
+                f"with alias starting '{alias_prefix}'"
+            )
+
+        # 3) Sort by last_updated_timestamp descending and pick the newest
         candidates.sort(key=lambda mv: mv.last_updated_timestamp, reverse=True)
         return candidates[0].version
 
     def test_model_loaded(self):
-        """Model should load via the staging alias without error."""
+        """Model should load via alias without error."""
         self.assertIsNotNone(self.model)
 
     def test_signature_matches(self):
         """If you logged an input signature, it should match the DataFrame columns."""
-        meta = getattr(self.model, "metadata", None)
-        sig = meta.get_input_schema() if meta else None
-        if sig is None:
+        metadata = getattr(self.model, "metadata", None)
+        if metadata is None or metadata.get_input_schema() is None:
             self.skipTest("No input signature logged with this model")
-        expected = [inp.name for inp in sig.inputs]
-        self.assertListEqual(expected, list(self.X_test.columns))
+        schema = metadata.get_input_schema().inputs
+        expected_cols = [inp.name for inp in schema]
+        self.assertListEqual(expected_cols, list(self.X_test.columns))
 
     def test_regression_performance(self):
         """Check basic regression metrics against your holdout set."""
@@ -82,7 +89,7 @@ class TestCricketScorePredictor(unittest.TestCase):
         mae = mean_absolute_error(self.y_test, preds)
         r2  = r2_score(self.y_test, preds)
 
-        # adjust thresholds as appropriate
+        # adjust these thresholds as appropriate for your data
         self.assertLessEqual(mse, 300, f"MSE too high: {mse:.1f}")
         self.assertLessEqual(mae, 15,  f"MAE too high: {mae:.1f}")
         self.assertGreaterEqual(r2,  0.50, f"R² too low: {r2:.2f}")

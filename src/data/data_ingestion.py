@@ -1,6 +1,7 @@
 # data ingestion
 import numpy as np
 import pandas as pd
+import os
 pd.set_option('future.no_silent_downcasting', True)
 
 from tqdm import tqdm
@@ -237,18 +238,15 @@ def save_data(
 
 def main():
     try:
-        # params = load_params(params_path='params.yaml')
-        # test_size = params['data_ingestion']['test_size']
-        test_size = 0.2
-        
-        df = load_yaml_directory(data_url='notebooks/t20s/')
-        # s3 = s3_connection.s3_operations("t20s", "aws_access_key", "aws_secret_access_key")
-        # df = s3.fetch_yaml_folder_from_s3("t20s")
+        # df = load_yaml_directory(data_url='notebooks/t20s/')
+        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        s3 = s3_connection.s3_operations("t20s", aws_access_key, aws_secret_access_key)
+        df = s3.fetch_yaml_folder_from_s3("t20s")
 
 
 
         final_df = extract_delivery_df(df)
-        # train_data, test_data = train_test_split(final_df, test_size=test_size, random_state=42)
         save_data(final_df, data_path='./data')
     except Exception as e:
         logging.error('Failed to complete the data ingestion process: %s', e)

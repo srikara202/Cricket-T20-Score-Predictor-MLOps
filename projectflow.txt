@@ -48,7 +48,7 @@
 31. Add .github/workflows/ci.yaml file
 
 32. Create key token on Dagshub for auth: Go to dagshub repo > Your settings > Tokens > Generate new token
-    >> Please make sure to save token << >> capstone_test: 54b1d67648a9b1267ef906fsdfsd8b292f779f0<<
+    >> Please make sure to save token << >> capstone_test: 'dagshub_key'<<
     >> Add this auth token to github secret&var and update on ci file
 
 
@@ -106,7 +106,7 @@ If the path points to your Anaconda environment (e.g., C:\Users\Personal\anacond
 ----------------------------------------------------------------------------------
 
 39. Create an EKS cluster:
-    eksctl create cluster --name flask-app-cluster --region us-east-1 --nodegroup-name flask-app-nodes --node-type t3.small --nodes 1 --nodes-min 1 --nodes-max 1 --managed
+    eksctl create cluster --name flask-app-cluster --region us-east-1 --nodegroup-name flask-app-nodes --node-type t3.large --nodes 1 --nodes-min 1 --nodes-max 1 --managed
 
 40. Update kubectl Config(Once the cluster is created, eksctl will automatically update your kubectl config file. However, you can verify and set it manually using:)
 aws eks --region us-east-1 update-kubeconfig --name flask-app-cluster (This ensures your kubectl is pointing to the correct cluster.)

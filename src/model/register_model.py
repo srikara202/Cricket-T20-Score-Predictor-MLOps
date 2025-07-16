@@ -63,6 +63,12 @@ def main():
     # point at your DagsHub MLflow registry
     uri = "https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow"
     mlflow.set_tracking_uri(uri)
+    # -------------------------------------------------------------------------------------
+    # Below code block is for local use
+    # -------------------------------------------------------------------------------------
+    # mlflow.set_tracking_uri('https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow')
+    # dagshub.init(repo_owner='srikara202', repo_name='Cricket-T20-Score-Predictor-MLOps', mlflow=True)
+    # -------------------------------------------------------------------------------------
 
     try:
         info = load_model_info("reports/experiment_info.json")

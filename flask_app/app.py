@@ -24,6 +24,12 @@ repo_owner = "srikara202"
 repo_name = "Cricket-T20-Score-Predictor-MLOps"
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 
+# Below code block is for local use
+# -------------------------------------------------------------------------------------
+# mlflow.set_tracking_uri('https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow')
+# dagshub.init(repo_owner='srikara202', repo_name='Cricket-T20-Score-Predictor-MLOps', mlflow=True)
+# -------------------------------------------------------------------------------------
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Load model (only the version tagged stage=production)
 # ─────────────────────────────────────────────────────────────────────────────

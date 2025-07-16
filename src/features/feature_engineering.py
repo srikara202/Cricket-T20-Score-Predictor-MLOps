@@ -79,11 +79,13 @@ def engineer_and_split(
         data.drop(columns=['venue'], inplace=True)
         logging.info("Dropped 'venue' column")
 
-        # 3. Filter to only cities with >600 deliveries
+        # 3. Filter to only cities with >600 deliveries and save them in a txt file
         counts = data['city'].value_counts()
 
 
         eligible = counts[counts > 600].index.tolist()
+        with open("flask_app/eligible_cities.txt", "w") as output:
+            output.write(str(eligible))
         with open("eligible_cities.txt", "w") as output:
             output.write(str(eligible))
         logging.info("saved eligible cities")

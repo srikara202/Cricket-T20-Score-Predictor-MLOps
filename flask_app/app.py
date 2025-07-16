@@ -25,22 +25,36 @@ repo_name = "Cricket-T20-Score-Predictor-MLOps"
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Load model
+# Load model (only the version tagged stage=production)
 # ─────────────────────────────────────────────────────────────────────────────
-def get_latest_model_version(model_name: str) -> str:
-    client = mlflow.MlflowClient()
-    versions = client.get_latest_versions(model_name)
-    return versions[0].version if versions else None
+import logging
+import mlflow
+from mlflow import MlflowClient
+
+def get_model_version_by_stage(model_name: str, stage: str) -> str:
+    client = MlflowClient()
+    # search all versions of this registered model
+    all_versions = client.search_model_versions(f"name = '{model_name}'")
+    # filter to only those with tag "stage" = the desired stage
+    stage_versions = [
+        mv for mv in all_versions
+        if mv.tags.get("stage") == stage
+    ]
+    if not stage_versions:
+        raise ValueError(f"No model version found tagged stage='{stage}'")
+    # pick the one most recently updated
+    chosen = max(stage_versions, key=lambda mv: mv.last_updated_timestamp)
+    return chosen.version
 
 MODEL_NAME    = "my_model"
-MODEL_VERSION = get_latest_model_version(MODEL_NAME)
+MODEL_VERSION = get_model_version_by_stage(MODEL_NAME, stage="production")
 MODEL_URI     = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
-logging.info("Loading model from %s", MODEL_URI)
+logging.info("Loading %r model (version %s) from %s", "production", MODEL_VERSION, MODEL_URI)
 model = mlflow.pyfunc.load_model(MODEL_URI)
 
 # ─────────────────────────────────────────────────────────────────────────────

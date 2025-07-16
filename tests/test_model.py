@@ -4,7 +4,7 @@ import unittest
 import mlflow
 import mlflow.pyfunc
 import pandas as pd
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.metrics import root_mean_squared_error, r2_score, mean_absolute_error
 
 
 class TestCricketScorePredictor(unittest.TestCase):
@@ -76,14 +76,14 @@ class TestCricketScorePredictor(unittest.TestCase):
     def test_regression_performance(self):
         """Check basic regression metrics against your holdout set."""
         preds = self.model.predict(self.X_test)
-        mse = mean_squared_error(self.y_test, preds)
+        rmse = root_mean_squared_error(self.y_test, preds)
         mae = mean_absolute_error(self.y_test, preds)
         r2  = r2_score(self.y_test, preds)
 
         # adjust these thresholds to suit your data
-        self.assertLessEqual(mse, 300, f"MSE too high: {mse:.1f}")
-        self.assertLessEqual(mae, 15,  f"MAE too high: {mae:.1f}")
-        self.assertGreaterEqual(r2,  0.50, f"R² too low: {r2:.2f}")
+        self.assertLessEqual(rmse, 8, f"MSE too high: {rmse:.1f}")
+        self.assertLessEqual(mae, 8,  f"MAE too high: {mae:.1f}")
+        self.assertGreaterEqual(r2,  0.90, f"R² too low: {r2:.2f}")
 
 
 if __name__ == "__main__":

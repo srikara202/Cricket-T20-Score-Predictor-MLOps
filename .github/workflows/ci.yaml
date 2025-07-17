@@ -46,10 +46,10 @@ jobs:
         run: python -m unittest tests/test_flask_app.py
 
       # ──────────────────────────────────────────────────────────────────────────
-      # → OCI / OCIR / OKE deployment
+      # OCI / OCIR / OKE deployment
       # ──────────────────────────────────────────────────────────────────────────
 
-      - name: Log in to OCIR (Oracle Container Registry)
+      - name: Log in to OCIR
         env:
           OCIR_AUTH_TOKEN: ${{ secrets.OCIR_AUTH_TOKEN }}
         run: |
@@ -68,25 +68,40 @@ jobs:
         run: |
           docker push ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
+      - name: Install OCI CLI
+        run: |
+          python -m pip install oci-cli
 
-      - name: Configure OCI CLI & kubeconfig
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
+      - name: Configure OCI CLI & create kubeconfig
         env:
           OCI_CLI_USER:        ${{ secrets.OCI_USER_OCID }}
           OCI_CLI_TENANCY:     ${{ secrets.OCI_TENANCY_OCID }}
           OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_CLI_KEY_B64:     ${{ secrets.OCI_PRIVATE_KEY }}
           OCI_CLI_REGION:      ${{ secrets.OCI_REGION }}
-        with:
-          command: |
-            ce cluster create-kubeconfig \
-              --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
-              --file $HOME/.kube/config \
-              --token-version 2.0.0
+        run: |
+          # write out key file
+          echo "$OCI_CLI_KEY_B64" | base64 -d > oci_api_key.pem
+          chmod 600 oci_api_key.pem
+
+          # write ~/.oci/config
+          mkdir -p ~/.oci
+          cat > ~/.oci/config <<-EOF
+          [DEFAULT]
+          user=$OCI_CLI_USER
+          fingerprint=$OCI_CLI_FINGERPRINT
+          tenancy=$OCI_CLI_TENANCY
+          region=$OCI_CLI_REGION
+          key_file=$(pwd)/oci_api_key.pem
+          EOF
+
+          # generate kubeconfig
+          mkdir -p ~/.kube
+          oci ce cluster create-kubeconfig \
+            --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
+            --file ~/.kube/config \
+            --overwrite-existing \
+            --token-version 2.0.0
 
       - name: Create Kubernetes Secret for MLflow
         run: |

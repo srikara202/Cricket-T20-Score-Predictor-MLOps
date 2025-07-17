@@ -1,114 +1,138 @@
+<!-- flask_app/templates/index.html -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>T20 Score Predictor</title>
-
     <!-- Bootstrap 5 CSS -->
     <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
-      integrity="sha384-YSK2ZB1w2JkWYHzK6PSw76ppbWbYz6rberoxgB2aoVtOv1s1+M+59Xw8o5Qv4KXJ"
+      integrity="sha384-…"
       crossorigin="anonymous"
     >
-
     <style>
       body {
-        /* two‑tone gradient background */
-        background: linear-gradient(135deg, #654ea3 0%, #eaafc8 100%);
+        background: linear-gradient(135deg, #1d2671, #c33764);
+        color: #fff;
         min-height: 100vh;
       }
       .card {
         border: none;
         border-radius: 1rem;
-        box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.15);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.3);
       }
-      .footer {
+      .form-label {
+        font-weight: 500;
+      }
+      .btn-primary {
+        background-color: #c33764;
+        border-color: #c33764;
+      }
+      .result-card {
+        background-color: rgba(255,255,255,0.1);
+        border: none;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-top: 1rem;
+        text-align: center;
+      }
+      .footer-text {
         font-size: 0.9rem;
+        opacity: 0.8;
+      }
+      .footer-text a {
+        color: #fff;
+        text-decoration: underline;
       }
     </style>
   </head>
-  <body class="d-flex flex-column justify-content-center align-items-center py-5">
-    <div class="container" style="max-width: 600px;">
-      <div class="card p-4 mb-4 bg-white">
-        <h1 class="card-title text-center mb-3">T20 Score Predictor</h1>
-        <p class="text-center text-muted mb-4">Instant estimates for your current innings.</p>
-
-        <form action="/predict" method="post">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Batting Team</label>
-              <select class="form-select" name="batting_team" required>
-                <option value="">-- choose --</option>
-                {% for t in teams %}
-                  <option value="{{t}}" {% if t==batting_team %}selected{% endif %}>{{t}}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Bowling Team</label>
-              <select class="form-select" name="bowling_team" required>
-                <option value="">-- choose --</option>
-                {% for t in teams %}
-                  <option value="{{t}}" {% if t==bowling_team %}selected{% endif %}>{{t}}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="col-12">
-              <label class="form-label">City</label>
-              <select class="form-select" name="city" required>
-                <option value="">-- choose --</option>
-                {% for c in cities %}
-                  <option value="{{c}}" {% if c==city %}selected{% endif %}>{{c}}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label">Current Score</label>
-              <input class="form-control" type="number" name="current_score" value="{{ current_score or '' }}" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Overs Done</label>
-              <input class="form-control" type="number" step="0.1" name="overs" value="{{ overs or '' }}" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Wickets Out</label>
-              <input class="form-control" type="number" name="wickets" value="{{ wickets or '' }}" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Runs in Last 5 Overs</label>
-              <input class="form-control" type="number" name="last_five" value="{{ last_five or '' }}" required>
-            </div>
-          </div>
-
-          <div class="d-grid mt-4">
-            <button type="submit" class="btn btn-primary btn-lg">Predict Score</button>
-          </div>
-        </form>
-
-        {% if result is not none %}
-          <div class="alert alert-success text-center mt-4 mb-0">
-            <strong>Predicted Score:</strong> {{ result }}
-          </div>
-        {% endif %}
+  <body>
+    <div class="container py-5">
+      <div class="text-center mb-4">
+        <h1 class="display-4">T20 Score Predictor</h1>
+        <p class="lead">Instant estimates for your current innings.</p>
       </div>
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card p-4 mb-4">
+            <div class="card-body">
+              <form action="/predict" method="post">
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label for="batting_team" class="form-label">Batting Team</label>
+                    <select id="batting_team" name="batting_team" class="form-select" required>
+                      <option value="">-- choose --</option>
+                      {% for t in teams %}
+                        <option value="{{t}}" {% if t==batting_team %}selected{% endif %}>{{t}}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="bowling_team" class="form-label">Bowling Team</label>
+                    <select id="bowling_team" name="bowling_team" class="form-select" required>
+                      <option value="">-- choose --</option>
+                      {% for t in teams %}
+                        <option value="{{t}}" {% if t==bowling_team %}selected{% endif %}>{{t}}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label for="city" class="form-label">City</label>
+                  <select id="city" name="city" class="form-select" required>
+                    <option value="">-- choose --</option>
+                    {% for c in cities %}
+                      <option value="{{c}}" {% if c==city %}selected{% endif %}>{{c}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label for="current_score" class="form-label">Current Score</label>
+                    <input type="number" id="current_score" name="current_score" class="form-control" value="{{ current_score or '' }}" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="overs" class="form-label">Overs Done</label>
+                    <input type="number" step="0.1" id="overs" name="overs" class="form-control" value="{{ overs or '' }}" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="wickets" class="form-label">Wickets Out</label>
+                    <input type="number" id="wickets" name="wickets" class="form-control" value="{{ wickets or '' }}" required>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label for="last_five" class="form-label">Runs in Last 5 Overs</label>
+                  <input type="number" id="last_five" name="last_five" class="form-control" value="{{ last_five or '' }}" required>
+                </div>
+                <div class="d-grid">
+                  <button type="submit" class="btn btn-primary btn-lg">Predict Score</button>
+                </div>
+              </form>
+            </div>
+          </div>
 
-      <footer class="text-center text-white footer">
-        This is an end‑to‑end MLOps project containerized with docker and hosted on an DigialOcean Kubernetes Cluster.  
-        See the source code at  
-        <a href="https://github.com/srikara202/Cricket-T20-Score-Predictor-MLOps"
-           class="text-decoration-underline text-white fw-bold"
-           target="_blank">GitHub</a>.
-      </footer>
+          {% if result is not none %}
+            <div class="result-card">
+              <h3>Predicted Score</h3>
+              <p class="display-5 fw-bold">{{ result }}</p>
+            </div>
+          {% endif %}
+
+          <div class="text-center mt-4 footer-text">
+            This is an end-to-end MLOps project containerized with docker and hosted on an DigitalOcean Kubernetes Cluster.  
+            See the source code at 
+            <a href="https://github.com/srikara202/Cricket-T20-Score-Predictor-MLOps" target="_blank">Github</a>.
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Bootstrap 5 JS Bundle (includes Popper) -->
+    <!-- Bootstrap JS Bundle -->
     <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-RyE5YzsW/9qb3iZ2+z3Jw0r7/N+42Y9z57S1T5Q+kISkz8o7SReow8HXOWCkQg3m"
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-…"
       crossorigin="anonymous"
     ></script>
   </body>

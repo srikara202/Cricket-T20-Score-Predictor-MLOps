@@ -17,6 +17,7 @@ spec:
       containers:
       - name: flask-app
         image: registry.digitalocean.com/flask-app-container-registry/flask-app:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:

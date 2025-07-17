@@ -2,39 +2,32 @@ name: CI Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   project-testing:
     runs-on: ubuntu-latest
 
     steps:
-      # ────────────────────────────────────────────────────────────────
+      # ───────────────────────────────────────────────
       # 1) Checkout & Python setup
-      # ────────────────────────────────────────────────────────────────
-      - name: Checkout code
-        uses: actions/checkout@v3
+      # ───────────────────────────────────────────────
+      - uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v2
+      - uses: actions/setup-python@v2
         with:
           python-version: '3.10'
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt
 
-      # ────────────────────────────────────────────────────────────────
+      # ───────────────────────────────────────────────
       # 2) Run DVC pipeline & tests
-      # ────────────────────────────────────────────────────────────────
+      # ───────────────────────────────────────────────
       - name: Run DVC pipeline
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -59,13 +52,12 @@ jobs:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: python -m unittest tests/test_flask_app.py
 
-      # ────────────────────────────────────────────────────────────────
-      # 3) OCI CLI install & configure
-      # ────────────────────────────────────────────────────────────────
-      - name: Install OCI CLI
-        run: pip install oci-cli
+      # ───────────────────────────────────────────────
+      # 3) Install & configure OCI CLI
+      # ───────────────────────────────────────────────
+      - run: pip install oci-cli
 
-      - name: Write OCI config file
+      - name: Configure OCI CLI files
         run: |
           mkdir -p $HOME/.oci
           cat > $HOME/.oci/config <<EOF
@@ -76,37 +68,30 @@ jobs:
           tenancy=${{ secrets.OCI_TENANCY_OCID }}
           region=${{ secrets.OCI_REGION }}
           EOF
-
-      - name: Write OCI private key
-        run: |
           echo "${{ secrets.OCI_PRIVATE_KEY }}" | base64 -d > oci_api_key.pem
           chmod 600 oci_api_key.pem
 
-      # ────────────────────────────────────────────────────────────────
+      # ───────────────────────────────────────────────
       # 4) Build & push Docker image to OCIR
-      # ────────────────────────────────────────────────────────────────
-      - name: Login to OCIR
+      # ───────────────────────────────────────────────
+      - name: Docker login to OCIR
         run: |
           echo "${{ secrets.OCIR_AUTH_TOKEN }}" \
             | docker login "${{ secrets.OCI_REGION }}.ocir.io" \
-               --username "${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}" \
-               --password-stdin
+              --username "${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}" \
+              --password-stdin
 
-      - name: Build & tag Docker image
+      - name: Build & push image
         run: |
           docker build -t flask-app:latest .
           docker tag flask-app:latest \
             ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
-
-      - name: Push Docker image to OCIR
-        run: |
           docker push ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
 
-      # ────────────────────────────────────────────────────────────────
-      # 5) Configure kubectl & deploy to OKE
-      # ────────────────────────────────────────────────────────────────
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
+      # ───────────────────────────────────────────────
+      # 5) kubectl + image‑pull‑secret + deploy to OKE
+      # ───────────────────────────────────────────────
+      - uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
 
@@ -117,11 +102,22 @@ jobs:
             --file $HOME/.kube/config \
             --region ${{ secrets.OCI_REGION }}
 
-      - name: Create Kubernetes Secret
+      - name: Create OCIR pull secret
+        run: |
+          kubectl create secret docker-registry ocir-secret \
+            --docker-server=${{ secrets.OCI_REGION }}.ocir.io \
+            --docker-username=${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }} \
+            --docker-password=${{ secrets.OCIR_AUTH_TOKEN }} \
+            --docker-email=not@required \
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
+
+      - name: Create CAPSTONE_TEST secret
         run: |
           kubectl create secret generic capstone-secret \
             --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
 
       - name: Deploy to OKE
         run: kubectl apply -f deployment.yaml

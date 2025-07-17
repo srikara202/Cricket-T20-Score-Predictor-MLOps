@@ -103,12 +103,18 @@ jobs:
             --region ${{ secrets.OCI_REGION }}
 
       - name: Create OCIR pull secret
+        # expose the secrets as env vars so we can quote them below
+        env:
+          OCI_REGION:            ${{ secrets.OCI_REGION }}
+          OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
+          OCI_USERNAME:          ${{ secrets.OCI_USERNAME }}
+          OCIR_AUTH_TOKEN:       ${{ secrets.OCIR_AUTH_TOKEN }}
         run: |
           kubectl create secret docker-registry ocir-secret \
-            --docker-server=${{ secrets.OCI_REGION }}.ocir.io \
-            --docker-username=${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }} \
-            --docker-password=${{ secrets.OCIR_AUTH_TOKEN }} \
-            --docker-email=not@required \
+            --docker-server="${OCI_REGION}.ocir.io" \
+            --docker-username="${OCI_TENANCY_NAMESPACE}/${OCI_USERNAME}" \
+            --docker-password="${OCIR_AUTH_TOKEN}" \
+            --docker-email="you@example.com" \
             --dry-run=client -o yaml \
           | kubectl apply -f -
 

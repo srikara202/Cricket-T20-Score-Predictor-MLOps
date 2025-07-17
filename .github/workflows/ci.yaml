@@ -29,17 +29,15 @@ jobs:
 
       - name: run pipeline
         env:
-          AWS_ACCESS_KEY_ID:    ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-        run: |
-          dvc repro
+          CAPSTONE_TEST:         ${{ secrets.CAPSTONE_TEST }}
+        run: dvc repro
 
       - name: Run model tests
         env:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-        run: |
-          python -m unittest tests/test_model.py
+        run: python -m unittest tests/test_model.py
 
       - name: Promote model to production
         if: success()
@@ -53,45 +51,60 @@ jobs:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: python -m unittest tests/test_flask_app.py
 
-      - name: Login to AWS ECR
-        if: success()
-        run: |
-            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws configure set region ${{ secrets.AWS_REGION }}
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      # ──────────────────────────────────────────────────────────────────────────
+      # → OCI / OCIR / OKE steps below
+      #    (requires you to have set these GitHub secrets ahead of time:
+      #     OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT, OCI_PRIVATE_KEY,
+      #     OCI_REGION, OCI_CLUSTER_OCID, OCI_TENANCY_NAMESPACE, OCI_USERNAME,
+      #     OCIR_AUTH_TOKEN)
+      # ──────────────────────────────────────────────────────────────────────────
 
-      - name: Build Docker image
-        run: |
-            docker build -t ${{ secrets.ECR_REPOSITORY }}:latest .
+      - name: Install and configure OCI CLI
+        uses: oracle/oci-cli-action@v1
+        with:
+          tenancy-ocid:  ${{ secrets.OCI_TENANCY_OCID }}
+          user-ocid:     ${{ secrets.OCI_USER_OCID }}
+          fingerprint:  ${{ secrets.OCI_FINGERPRINT }}
+          private-key:  ${{ secrets.OCI_PRIVATE_KEY }}
+          region:       ${{ secrets.OCI_REGION }}
 
-      - name: Tag Docker image
+      - name: Login to OCIR (Oracle Container Registry)
         run: |
-            docker tag ${{ secrets.ECR_REPOSITORY }}:latest \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:latest
+          echo "${{ secrets.OCIR_AUTH_TOKEN }}" \
+            | docker login "${{ secrets.OCI_REGION }}.ocir.io" \
+              --username "${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}" \
+              --password-stdin
 
-    
-      - name: Check Docker Authentication
-        run: docker info
-
-      - name: Push Docker image to ECR
+      - name: Build & Tag Docker image
         run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:latest
+          docker build -t flask-app:latest .
+          docker tag flask-app:latest \
+            ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
+
+      - name: Push Docker image to OCIR
+        run: |
+          docker push ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
 
       - name: Set Up kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
-      
-      - name: Update kubeconfig
+
+      - name: Update kubeconfig for OKE
         run: |
-          aws eks update-kubeconfig --region us-east-1 --name flask-app-cluster
+          oci ce cluster create-kubeconfig \
+            --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
+            --file $HOME/.kube/config \
+            --region ${{ secrets.OCI_REGION }} \
+            --token-version 2.0.0
 
       - name: Create Kubernetes Secret
         run: |
           kubectl create secret generic capstone-secret \
-            --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} --dry-run=client -o yaml | kubectl apply -f -
+            --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
 
-      - name: Deploy to EKS
+      - name: Deploy to OKE
         run: |
           kubectl apply -f deployment.yaml

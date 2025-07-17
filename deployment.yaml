@@ -16,16 +16,17 @@ spec:
     spec:
       containers:
       - name: flask-app
-        image: 664418992516.dkr.ecr.us-east-1.amazonaws.com/flask-app:latest
+        # point at your OCIR‐hosted image
+        image: us-ashburn-1.ocir.io/ideguun3v2od/flask-app/flask-app:latest
         ports:
         - containerPort: 5000
         resources:
           requests:
             memory: "256Mi"
-            cpu: "250m"
+            cpu:    "250m"
           limits:
             memory: "512Mi"
-            cpu: "1"
+            cpu:    "1"
         env:
         - name: CAPSTONE_TEST
           valueFrom:

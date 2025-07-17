@@ -124,6 +124,8 @@ aws eks --region us-east-1 update-kubeconfig --name flask-app-cluster (This ensu
     aws eks --region us-east-1 describe-cluster --name flask-app-cluster --query "cluster.status"
 
 
+43.5. In deployment.yaml line 19, make sure that 
+
 44. Check cluster connectivity:
 kubectl get nodes
 
@@ -143,7 +145,7 @@ kubectl get svc
 kubectl get svc flask-app-service
 
 49. Try externa-ip:5000 directly on url or on terminal : curl http://external-ip:5000
-curl http://a6bf6255d5f61470c9782b8955c98271-1409247973.us-east-1.elb.amazonaws.com:5000
+curl http://a49a1e5dd65904caeb7f43598126d9c2-1778851358.us-east-1.elb.amazonaws.com:5000
 
 
 

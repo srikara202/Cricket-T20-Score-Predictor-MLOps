@@ -1,108 +1,118 @@
 name: CI Pipeline
+on: [push]
 
-on: push
+env:
+  IMAGE_NAME: flask-app
+  OCIR_REPO: ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_REPO_NAME }}
 
 jobs:
-  project-testing:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
 
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-    - name: Install dependencies
-      run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-    - name: Run DVC pipeline
-      env:
-        AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        CAPSTONE_TEST:         ${{ secrets.CAPSTONE_TEST }}
-      run: dvc repro
+      - name: Run DVC pipeline
+        env:
+          AWS_ACCESS_KEY_ID:    ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          CAPSTONE_TEST:         ${{ secrets.CAPSTONE_TEST }}
+        run: dvc repro
 
-    - name: Run model tests
-      env:
-        CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-      run: python -m unittest tests/test_model.py
+      - name: Run model tests
+        env:
+          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
+        run: python -m unittest tests/test_model.py
 
-    - name: Promote model to production
-      if: success()
-      env:
-        CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-      run: python scripts/promote_model.py
+      - name: Promote model to production
+        if: success()
+        env:
+          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
+        run: python scripts/promote_model.py
 
-    - name: Run Flask app tests
-      if: success()
-      env:
-        CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-      run: python -m unittest tests/test_flask_app.py
+      - name: Run Flask app tests
+        if: success()
+        env:
+          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
+        run: python -m unittest tests/test_flask_app.py
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # OCI / OCIR / OKE deployment steps
-    # Requires these secrets:
-    #   OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT,
-    #   OCI_PRIVATE_KEY (base64), OCI_REGION, OCI_CLUSTER_OCID,
-    #   OCI_TENANCY_NAMESPACE, OCI_USERNAME, OCIR_AUTH_TOKEN
-    # ──────────────────────────────────────────────────────────────────────────
+      # ──────────────────────────────────────────────────────────────────────────
+      # → OCI / OCIR / OKE steps below
+      #   Make sure you’ve set these secrets:
+      #     OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT,
+      #     OCI_PRIVATE_KEY (raw PEM), OCI_REGION,
+      #     OCI_TENANCY_NAMESPACE, OCI_USERNAME, OCIR_AUTH_TOKEN,
+      #     OCI_CLUSTER_OCID, OCI_REPO_NAME
+      # ──────────────────────────────────────────────────────────────────────────
 
-    - name: Install & configure OCI CLI
-      uses: oracle/oci-cli-action@v1
-      with:
-        tenancy-ocid: ${{ secrets.OCI_TENANCY_OCID }}
-        user-ocid:    ${{ secrets.OCI_USER_OCID }}
-        fingerprint: ${{ secrets.OCI_FINGERPRINT }}
-        private-key: ${{ secrets.OCI_PRIVATE_KEY }}
-        region:      ${{ secrets.OCI_REGION }}
+      - name: Setup OCI CLI
+        uses: danielewood/actions-oci-cli@v1
+        with:
+          tenancy:     ${{ secrets.OCI_TENANCY_OCID }}
+          user:        ${{ secrets.OCI_USER_OCID }}
+          fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+          api-key:     ${{ secrets.OCI_PRIVATE_KEY }}
+          region:      ${{ secrets.OCI_REGION }}
 
-    - name: Login to OCIR
-      run: |
-        echo "${{ secrets.OCIR_AUTH_TOKEN }}" \
-          | docker login "${{ secrets.OCI_REGION }}.ocir.io" \
-            --username "${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}" \
-            --password-stdin
+      - name: Login to OCIR
+        run: |
+          echo "${{ secrets.OCIR_AUTH_TOKEN }}" \
+            | docker login "${{ secrets.OCI_REGION }}.ocir.io" \
+              --username "${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}" \
+              --password-stdin
 
-    - name: Build & Tag Docker image
-      run: |
-        docker build -t flask-app:latest .
-        docker tag flask-app:latest \
-          ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
+      - name: Build & Push Docker image
+        run: |
+          docker build -t $IMAGE_NAME:latest .
+          docker tag     $IMAGE_NAME:latest $OCIR_REPO/$IMAGE_NAME:latest
+          docker push    $OCIR_REPO/$IMAGE_NAME:latest
 
-    - name: Push Docker image to OCIR
-      run: |
-        docker push ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
 
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
+      - name: Configure kubeconfig for OKE
+        run: |
+          oci ce cluster create-kubeconfig \
+            --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
+            --file $HOME/.kube/config \
+            --region ${{ secrets.OCI_REGION }} \
+            --token-version 2.0.0
 
-    - name: Update kubeconfig for OKE
-      run: |
-        oci ce cluster create-kubeconfig \
-          --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
-          --file $HOME/.kube/config \
-          --region ${{ secrets.OCI_REGION }} \
-          --token-version 2.0.0
+      - name: Create OCIR pull-secret
+        run: |
+          kubectl create secret docker-registry ocir-secret \
+            --docker-server=${{ secrets.OCI_REGION }}.ocir.io \
+            --docker-username=${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }} \
+            --docker-password=${{ secrets.OCIR_AUTH_TOKEN }} \
+            --docker-email=unused@example.com \
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
 
-    - name: Create Kubernetes Secret
-      run: |
-        kubectl create secret generic capstone-secret \
-          --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
-          --dry-run=client -o yaml \
-        | kubectl apply -f -
+      - name: Create CAPSTONE_TEST secret
+        run: |
+          kubectl create secret generic capstone-secret \
+            --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
 
-    - name: Deploy to OKE
-      run: kubectl apply -f deployment.yaml
+      - name: Deploy to OKE
+        run: |
+          kubectl apply -f deployment.yaml

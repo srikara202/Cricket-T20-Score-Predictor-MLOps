@@ -14,28 +14,29 @@ spec:
       labels:
         app: flask-app
     spec:
-      # ← tell k8s to use our pull-secret
+      # ← pull private images from OCIR
       imagePullSecrets:
-      - name: ocir-secret
+        - name: ocir-secret
 
       containers:
-      - name: flask-app
-        image: us-ashburn-1.ocir.io/ideguun3v2od/flask-app/flask-app:latest
-        ports:
-        - containerPort: 5000
-        env:
-        - name: CAPSTONE_TEST
-          valueFrom:
-            secretKeyRef:
-              name: capstone-secret
-              key: CAPSTONE_TEST
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu:    "250m"
-          limits:
-            memory: "512Mi"
-            cpu:    "1"
+        - name: flask-app
+          image: us-ashburn-1.ocir.io/ideguun3v2od/flask-app/flask-app:latest
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu:    "250m"
+            limits:
+              memory: "512Mi"
+              cpu:    "1"
+          env:
+            - name: CAPSTONE_TEST
+              valueFrom:
+                secretKeyRef:
+                  name: capstone-secret
+                  key:  CAPSTONE_TEST
+
 ---
 apiVersion: v1
 kind: Service
@@ -46,7 +47,7 @@ spec:
   selector:
     app: flask-app
   ports:
-  - name: http
-    protocol: TCP
-    port: 5000
-    targetPort: 5000
+    - name: http
+      protocol: TCP
+      port:       5000
+      targetPort: 5000

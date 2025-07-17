@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: flask-app
-        image: {{ secrets.OCI_REGION }}.ocir.io/{{ secrets.OCI_TENANCY_NAMESPACE }}/flask-app/flask-app:latest
+        image: us-ashburn-1.ocir.io/ideguun3v2od/flask-app/flask-app:latest
         ports:
         - containerPort: 5000
         env:
@@ -42,6 +42,7 @@ spec:
   selector:
     app: flask-app
   ports:
-    - protocol: TCP
-      port: 5000
-      targetPort: 5000
+  - name: http
+    protocol: TCP
+    port: 5000
+    targetPort: 5000

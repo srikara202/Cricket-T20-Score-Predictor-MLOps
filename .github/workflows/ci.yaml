@@ -5,12 +5,14 @@ on: push
 jobs:
   project-testing:
     runs-on: ubuntu-latest
+    env:
+      CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.10'
@@ -24,84 +26,39 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run DVC pipeline
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          CAPSTONE_TEST:         ${{ secrets.CAPSTONE_TEST }}
-        run: |
-          dvc repro
+        run: dvc repro
 
       - name: Run model tests
-        env:
-          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-        run: |
-          python -m unittest tests/test_model.py
+        run: python -m unittest tests/test_model.py
 
       - name: Promote model to production
         if: success()
-        env:
-          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-        run: |
-          python scripts/promote_model.py
+        run: python scripts/promote_model.py
 
       - name: Run Flask app tests
         if: success()
-        env:
-          CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
-        run: |
-          python -m unittest tests/test_flask_app.py
+        run: python -m unittest tests/test_flask_app.py
 
       # ──────────────────────────────────────────────────────────────────────────
-      # AWS ECR build & push (still needed for your DVC/AWS steps)
-      # ──────────────────────────────────────────────────────────────────────────
-      # ──────────────────────────────────────────────────────────────────────────
-      # OCI / OCIR / OKE steps
+      # → OCI / OCIR / OKE deployment
       # ──────────────────────────────────────────────────────────────────────────
 
-      - name: Install OCI CLI
-        run: |
-          pip install oci-cli
-
-      - name: Decode OCI private key
+      - name: Log in to OCIR (Oracle Container Registry)
         env:
-          OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCIR_AUTH_TOKEN: ${{ secrets.OCIR_AUTH_TOKEN }}
         run: |
-          echo "$OCI_PRIVATE_KEY_B64" | base64 -d > oci_api_key.pem
+          echo "${OCIR_AUTH_TOKEN}" \
+            | docker login "${{ secrets.OCI_REGION }}.ocir.io" \
+                --username "${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}" \
+                --password-stdin
 
-      - name: Write OCI CLI config
-        env:
-          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_USER_OCID:    ${{ secrets.OCI_USER_OCID }}
-          OCI_FINGERPRINT:  ${{ secrets.OCI_FINGERPRINT }}
-          OCI_REGION:       ${{ secrets.OCI_REGION }}
-        run: |
-          mkdir -p ~/.oci
-          cat > ~/.oci/config <<-EOF
-          [DEFAULT]
-          tenancy=${OCI_TENANCY_OCID}
-          user=${OCI_USER_OCID}
-          fingerprint=${OCI_FINGERPRINT}
-          key_file=$(pwd)/oci_api_key.pem
-          region=${OCI_REGION}
-          EOF
-
-      - name: Login to OCIR
-        env:
-          OCI_REGION:            ${{ secrets.OCI_REGION }}
-          OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
-          OCI_USERNAME:          ${{ secrets.OCI_USERNAME }}
-          OCIR_AUTH_TOKEN:       ${{ secrets.OCIR_AUTH_TOKEN }}
-        run: |
-          echo "$OCIR_AUTH_TOKEN" \
-            | docker login "${OCI_REGION}.ocir.io" \
-              --username "${OCI_TENANCY_NAMESPACE}/${OCI_USERNAME}" \
-              --password-stdin
-
-      - name: Build & Tag Docker image for OCIR
+      - name: Build & tag Docker image
         run: |
           docker build -t flask-app:latest .
           docker tag flask-app:latest \
@@ -116,15 +73,22 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Update kubeconfig for OKE
-        run: |
-          oci ce cluster create-kubeconfig \
-            --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
-            --file $HOME/.kube/config \
-            --region ${{ secrets.OCI_REGION }} \
-            --token-version 2.0.0
+      - name: Configure OCI CLI & kubeconfig
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        env:
+          OCI_CLI_USER:        ${{ secrets.OCI_USER_OCID }}
+          OCI_CLI_TENANCY:     ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_CLI_REGION:      ${{ secrets.OCI_REGION }}
+        with:
+          command: |
+            ce cluster create-kubeconfig \
+              --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
+              --file $HOME/.kube/config \
+              --token-version 2.0.0
 
-      - name: Create Kubernetes Secret
+      - name: Create Kubernetes Secret for MLflow
         run: |
           kubectl create secret generic capstone-secret \
             --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \

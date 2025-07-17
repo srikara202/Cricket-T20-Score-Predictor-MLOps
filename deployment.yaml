@@ -14,6 +14,10 @@ spec:
       labels:
         app: flask-app
     spec:
+      # ← tell k8s to use our pull-secret
+      imagePullSecrets:
+      - name: ocir-secret
+
       containers:
       - name: flask-app
         image: us-ashburn-1.ocir.io/ideguun3v2od/flask-app/flask-app:latest

@@ -95,12 +95,12 @@ jobs:
           key_file=$(pwd)/oci_api_key.pem
           EOF
 
-          # generate kubeconfig
+          # generate kubeconfig (correct flag is --overwrite)
           mkdir -p ~/.kube
           oci ce cluster create-kubeconfig \
             --cluster-id ${{ secrets.OCI_CLUSTER_OCID }} \
             --file ~/.kube/config \
-            --overwrite-existing \
+            --overwrite \
             --token-version 2.0.0
 
       - name: Create Kubernetes Secret for MLflow

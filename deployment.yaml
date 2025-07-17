@@ -14,26 +14,17 @@ spec:
       labels:
         app: flask-app
     spec:
-      imagePullSecrets:
-        - name: ocir-secret          # ← your OCIR pull-secret
       containers:
-        - name: flask-app
-          image: us-ashburn-1.ocir.io/ideguun3v2od/flask-app/flask-app:latest
-          ports:
-            - containerPort: 5000
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu:    "250m"
-            limits:
-              memory: "512Mi"
-              cpu:    "1"
-          env:
-            - name: CAPSTONE_TEST
-              valueFrom:
-                secretKeyRef:
-                  name: capstone-secret
-                  key:  CAPSTONE_TEST
+      - name: flask-app
+        image: registry.digitalocean.com/flask-app-container-registry/flask-app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: CAPSTONE_TEST
+          valueFrom:
+            secretKeyRef:
+              name: capstone-secret
+              key: CAPSTONE_TEST
 
 ---
 apiVersion: v1
@@ -45,7 +36,5 @@ spec:
   selector:
     app: flask-app
   ports:
-    - name: http
-      protocol: TCP
-      port: 5000
-      targetPort: 5000
+  - port:       5000
+    targetPort: 5000

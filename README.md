@@ -152,8 +152,8 @@ Detailed Kubernetes configurations and YAML files are provided in the repository
 
 For questions or suggestions, feel free to contact me:
 
-* GitHub: [yourusername](https://github.com/yourusername)
-* Email: [youremail@example.com](mailto:youremail@example.com)
+* LinkedIn: [Srikara Shankara](https://www.linkedin.com/in/srikarashankara/)
+* Email: [srikarashankara@outlook.com](srikarashankara@outlook.com)
 
 ---
 

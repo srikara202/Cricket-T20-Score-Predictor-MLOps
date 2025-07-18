@@ -19,16 +19,19 @@
         min-height: 100vh;
       }
       .card {
+        background-color: #5e5d5d;         /* make card black */
+        color: #f8f8f8;                    /* ensure all text inside is white */
         border: none;
         border-radius: 1rem;
         box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.3);
       }
       .form-label {
         font-weight: 500;
+        color: #fff;                    /* reinforce white labels */
       }
       .btn-primary {
         background-color: #c33764;
-        border-color: #c33764;
+        border-color: #f49cb7;
       }
       .result-card {
         background-color: rgba(255,255,255,0.1);
@@ -37,10 +40,12 @@
         padding: 1rem;
         margin-top: 1rem;
         text-align: center;
+        color: #fff;                    /* white text in result box */
       }
       .footer-text {
         font-size: 0.9rem;
         opacity: 0.8;
+        color: #fff;
       }
       .footer-text a {
         color: #fff;
@@ -51,7 +56,7 @@
   <body>
     <div class="container py-5">
       <div class="text-center mb-4">
-        <h1 class="display-4">T20 Score Predictor</h1>
+        <h1 class="display-4">International T20 Cricket Score Predictor</h1>
         <p class="lead">Instant estimates for your current innings.</p>
       </div>
       <div class="row justify-content-center">

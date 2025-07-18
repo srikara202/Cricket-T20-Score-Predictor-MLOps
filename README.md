@@ -23,6 +23,18 @@ Cricket T20 scores swing wildly from ball to ball. Accurate, real‑time pro
 | **Observability**    | Prometheus (/metrics endpoint) · Grafana dashboards                             |
 | **Coding Standards** | Modular OOP Python (src/), logger + unit tests, pre‑commit, flake8              |
 
+Specifically regarding MLOps, the following libraries/toolstacks have been used:
+
+1. Cookiecutter to create an empty project skeleton
+2. Git and GitHub for code versioning
+3. DVC for Data Versioning and Pipeline Automation
+4. MLFlow for model-versioning and storage
+5. AWS S3 for Data Storage
+6. Github Actions for Continuous Integration and Continuous Deployment
+7. Docker to containerize applications
+8. Kubernetes cluster deployment
+9. Prometheus-Grafana for monitoring and alerting
+
 ---
 
 ## 3 • Data & Feature Engineering

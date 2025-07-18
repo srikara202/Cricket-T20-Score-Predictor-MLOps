@@ -1,5 +1,9 @@
 import unittest
 import json
+# import sys
+# import os
+# sys.path.append(os.path.abspath("flask_app"))
+# from app import app
 from flask_app.app import app
 
 class FlaskAppTests(unittest.TestCase):
@@ -22,7 +26,7 @@ class FlaskAppTests(unittest.TestCase):
         payload = {
             "batting_team": "India",
             "bowling_team": "England",
-            "City": "London",
+            "city": "London",
             "current_score": 80,
             "balls_left": 60,
             "wickets_left": 6,

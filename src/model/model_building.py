@@ -62,7 +62,7 @@ def build_and_train_model(X_train, y_train):
         # 1. Define the column transformer
         transformer = ColumnTransformer(
             transformers=[
-                ('ohe', OneHotEncoder(sparse_output=False, drop='first'),
+                ('ohe', OneHotEncoder(sparse_output=False, drop='first', handle_unknown="ignore"),
                  ['batting_team', 'bowling_team', 'city'])
             ],
             remainder='passthrough'

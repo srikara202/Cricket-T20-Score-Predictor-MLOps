@@ -1,285 +1,266 @@
--------------------------Setting up project structure---------------------------
+\-------------------------Setting up project structure---------------------------
 
 1. Create repo, clone it in local
-2. Create a virtual environment named 'atlas' - conda create -n atlas python=3.10
-3. Activate the virtual environment - conda activate atlas
-4. pip install cookiecutter
-5. cookiecutter -c v1 https://github.com/drivendata/cookiecutter-data-science
-6. Rename src.models -> src.model
-7. git add - commit - push
+2. Create a virtual environment named **"atlas"**
 
--------------------------Setup MLFlow on Dagshub---------------------------
-8. Go to: https://dagshub.com/dashboard
-9. Create > New Repo > Connect a repo > (Github) Connect > Select your repo > Connect
-10. Copy experiment tracking url and code snippet. (Also try: Go To MLFlow UI)
-11. pip install dagshub & mlflow
+   ```bash
+   conda create -n atlas python=3.10
+   conda activate atlas
+   ```
+3. Install the cookiecutter data‑science template
 
-12. Run the exp notebooks
-13. git add - commit - push
+   ```bash
+   pip install cookiecutter
+   cookiecutter -c v1 https://github.com/drivendata/cookiecutter-data-science
+   ```
+4. Rename `src.models` ➜ `src.model`
+5. `git add` → `commit` → `push`
 
-14. dvc init
-15. create a local folder as "local_s3" (temporary work)
-16. on terminal - "dvc remote add -d mylocal local_s3"
+\-------------------------Set up MLflow on DagsHub---------------------------
+6\. Log in to **[https://dagshub.com/dashboard](https://dagshub.com/dashboard)**
+7\. **Create > New Repo > Connect a repo > (GitHub)** → select your repo → **Connect**
+8\. Copy the experiment‑tracking URL & code snippet (or **Go to MLflow UI**).
+9\. \`\`\`bash
+pip install dagshub mlflow
 
-17. Add code to below files/folders inside src dir:
-    - logger
-    - data_ingestion.py
-    - data_preprocessing.py
-    - feature_engineering.py
-    - model_building.py
-    - model_evaluation.py
-    - register_model.py
-18. add file - dvc.yaml (till model evaluation.metrics)
-19. add file - params.yaml
-20. DVC pipeline is ready to run - dvc repro
-21. Once do - dvc status
-22. git add - commit - push
+````
+10. Run the experiment notebooks, then `git add → commit → push`.
 
-23. Need to add S3 as remote storage - Create IAM User(keep cred) and S3 bucket
-24. pip install - dvc[s3] & awscli
-25. Checking/deleting dvc remote (optional) - [dvc remote list & dvc remote remove <name>] 
-26. Set aws cred - aws configure
-27. Add s3 as dvc remote storage - dvc remote add -d myremote s3://<bucket-name>
+-------------------------Data Version Control (DVC)---------------------------
+11. ```bash
+dvc init
+mkdir local_s3            # temporary local cache
+dvc remote add -d mylocal local_s3
+````
 
-28. Create new dir - flask_app | Inside that, add rest of the files and dir
-29. pip install flask and run the app (dvc push - to push data to S3)
+12. Add modular code inside **src**:
 
-30. pip freeze > requirements.txt
-31. Add .github/workflows/ci.yaml file
+* `logger/`
+* `data_ingestion.py`
+* `data_preprocessing.py`
+* `feature_engineering.py`
+* `model_building.py`
+* `model_evaluation.py`
+* `register_model.py`
 
-32. Create key token on Dagshub for auth: Go to dagshub repo > Your settings > Tokens > Generate new token
-    >> Please make sure to save token << >> capstone_test: 'dagshub_key'<<
-    >> Add this auth token to github secret&var and update on ci file
+13. Create `dvc.yaml` (pipeline up to *model\_evaluation.metrics*) & `params.yaml`.
+14. Run pipeline & check status
 
+```bash
+dvc repro
+dvc status
+```
 
-31. Add dir "tests"&"scripts" and files within. This will contain our test related scripts for CI.
+15. `git add → commit → push`
 
->>>>> Moving to Docker <<<<<
-32. pip install pipreqs
-33. cd flask_app & do "pipreqs . --force"
-34. Add dockerfile and start docker-desktop in background
-35. go to root dir and: "docker build -t capstone-app:latest ."
-36. Try running the image: "docker run -p 8888:5000 capstone-app:latest"
-    - This run will give 'OSError: capstone_test environment variable is not set'...obviously
-    - alternate: docker run -p 8888:5000 -e CAPSTONE_TEST=dagshub_key capstone-app:latest
-    - docker push youruser/capstone-app:latest (optional)
-    - optional: try to delete image locally and pull it from dockerhub and run (optional)
+\-------------------------Object Storage (S3‑compatible)---------------------------
+16\. Create a **DigitalOcean Space** (acts like an S3 bucket) and an **access key/secret**.
+17\. \`\`\`bash
+pip install "dvc\[s3]"     # S3 compatibility
+export AWS\_ACCESS\_KEY\_ID=...       # DO Spaces key
+export AWS\_SECRET\_ACCESS\_KEY=...
+export AWS\_DEFAULT\_REGION="us-east-1"   # any region string works
 
-37. Setup aws services for below secrets and variables:
-	AWS_ACCESS_KEY_ID
-	AWS_SECRET_ACCESS_KEY
-	AWS_REGION
-	ECR_REPOSITORY (capstone-proj)
-    AWS_ACCOUNT_ID
-   (Also add this permission to the IAM user: AmazonEC2ContainerRegistryFullAccess)
+# add DO Space as remote
 
-38. Execute CICD pipeline till the stage where we build and push image to ECR.
+dvc remote add -d myremote s3://\<space‑name>/\<optional‑prefix>
+dvc push
 
+````
 
-----------------------------------------------------------------------------------
-*********Setup required before moving to EKS deployment*********
-----------------------------------------------------------------------------------
-* Run the following in PowerShell to see the AWS CLI path being used: Get-Command aws
-If the path points to your Anaconda environment (e.g., C:\Users\Personal\anaconda3\...), it’s a conflicting installation.
+-------------------------API Packaging---------------------------
+18. `mkdir flask_app` and add API code & assets.
+19. ```bash
+pip install flask
+````
 
-* Uninstall Python-Based AWS CLI(Remove the conflicting AWS CLI from your Python environment): pip uninstall awscli
-* Verify it's uninstalled: aws --version
-* Update Environment Variables:
-> Make sure the .msi AWS CLI path is in your system PATH (usually installed at C:\Program Files\Amazon\AWSCLIV2\aws.exe).
-> Add it to your PATH if missing: Open Control Panel > System > Advanced System Settings > Environment Variables. Under "System Variables," find Path, and add the AWS CLI path: C:\Program Files\Amazon\AWSCLIV2\
-> Test AWS CLI Again: aws --version
-----------------------------------------------------------------------------------
+20. Local test: `python app.py`    ⚙️ (push data to Space with `dvc push` if updated)
 
-* Download kubectl: Invoke-WebRequest -Uri "https://dl.k8s.io/release/v1.28.2/bin/windows/amd64/kubectl.exe" -OutFile "kubectl.exe"
-* Locate the Download: Get-Location
-* Move kubectl.exe to a directory in your system PATH, such as C:\Windows\System32: Move-Item -Path .\kubectl.exe -Destination "C:\Windows\System32"
-* Test if kubectl is properly installed: kubectl version --client
+\-------------------------CI pipeline scaffold---------------------------
+21\. \`\`\`bash
+pip freeze > requirements.txt
+mkdir -p .github/workflows
+
+# add ci.yaml (build, test, push image, deploy)
+
+````
+22. **Generate a DagsHub token** → _Settings > Tokens > Generate_ → save as **dagshub_key**.
+   Add this as a GitHub repository secret & reference it in `ci.yaml`.
+23. Add `tests/` and `scripts/` for CI checks.
 
 
-* Download eksctl: Invoke-WebRequest -Uri "https://github.com/weaveworks/eksctl/releases/download/v0.158.0/eksctl_Windows_amd64.zip" -OutFile "eksctl.zip"
-* Extract eksctl: Expand-Archive -Path .\eksctl.zip -DestinationPath .
-* Move the extracted eksctl.exe file to C:\Windows\System32 or any folder in your system PATH: Move-Item -Path .\eksctl.exe -Destination "C:\Windows\System32\eksctl.exe"
-----------------------------------------------------------------------------------
-* Verify AWS CLI: aws --version
-* Verify kubectl: kubectl version --client
-* Verify eksctl: eksctl version
-----------------------------------------------------------------------------------
+======================== Moving to Docker ========================
+24. ```bash
+pip install pipreqs
+cd flask_app
+pipreqs . --force
+````
 
-39. Create an EKS cluster:
-    eksctl create cluster --name flask-app-cluster --region us-east-1 --nodegroup-name flask-app-nodes --node-type t3.large --nodes 1 --nodes-min 1 --nodes-max 1 --managed
+25. Add a **Dockerfile**, start Docker Desktop, then build & test locally:
 
-40. Update kubectl Config(Once the cluster is created, eksctl will automatically update your kubectl config file. However, you can verify and set it manually using:)
-aws eks --region us-east-1 update-kubeconfig --name flask-app-cluster (This ensures your kubectl is pointing to the correct cluster.)
+```bash
+docker build -t cricket-app:latest .
+docker run -p 8888:5000 -e CAPSTONE_TEST=$dagshub_key cricket-app:latest
+```
 
-41. Check EKS Cluster Configuration Ensure you can access your EKS cluster by running
-    aws eks list-clusters
+(Optional) Push to Docker Hub or DigitalOcean Container Registry (DOCR).
 
-42. Delete cluster(optional):
-    eksctl delete cluster --name flask-app-cluster --region us-east-1
+\-------------------------DigitalOcean Credentials---------------------------
+26\. In GitHub Secrets & Variables store:
 
-    Also, verify cluster deletion:
-    eksctl get cluster --region us-east-1
+* `DIGITALOCEAN_ACCESS_TOKEN`
+* `DOCKERHUB_USERNAME` & `DOCKERHUB_PASSWORD` **or** `DOCR_NAME`
+* `DAGSHUB_KEY` (capstone\_test)
+* any other env vars your app needs
 
-43. Verify the cluster status:
-    aws eks --region us-east-1 describe-cluster --name flask-app-cluster --query "cluster.status"
+27. Configure **ci.yaml** stages:
+28. Build & test Docker image.
+29. Push image to Docker Hub/DOCR.
+30. Deploy (kubectl apply) to DigitalOcean Kubernetes via `doctl`.
 
+---
 
-43.5. In deployment.yaml line 19, make sure that 
+## \*\*\*\*\*\*\*\*\* Setup before DigitalOcean Kubernetes (DOKS) deployment \*\*\*\*\*\*\*\*\*
 
-44. Check cluster connectivity:
+◆ **Install DigitalOcean CLI**
+
+```bash
+# macOS/Homebrew
+brew install doctl
+# Windows (PowerShell)
+choco install doctl
+```
+
+◆ **Authenticate & verify**
+
+```bash
+doctl auth init --access-token $DIGITALOCEAN_ACCESS_TOKEN
+doctl account get
+```
+
+◆ **Install kubectl** (if not already)
+
+```bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/windows/amd64/kubectl.exe"
+# move kubectl.exe to a folder in PATH (e.g., C:\Windows\System32)
+```
+
+◆ **Create a DOKS cluster**
+
+```bash
+doctl kubernetes cluster create flask-app-cluster \
+    --region syd1 \
+    --version 1.30.0 \
+    --size s-2vcpu-4gb \
+    --node-pool "name=flask-app-nodes;count=1;size=s-2vcpu-4gb"
+```
+
+◆ **Fetch kubeconfig & check nodes**
+
+```bash
+doctl kubernetes cluster kubeconfig save flask-app-cluster
 kubectl get nodes
-
-45. Check the namespaces:
 kubectl get namespaces
+```
 
-46. Verify the deployment:
-kubectl get pods
-kubectl get svc
+◆ **Deploy the app**
 
-47. Deploy the app on EKS via CICD pipeline 
-  >> edit ci.yaml, deployment.yaml, dockerfile
-  >> Also edit the security group for nodes and edit inbound rule for 5000 port
+```bash
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml   # LoadBalancer
+```
 
+◆ **Retrieve external IP & test**
 
-48. Once the LoadBalancer service is up, get the external IP:
+```bash
 kubectl get svc flask-app-service
+curl http://<external-ip>:5000
+```
 
-49. Try externa-ip:5000 directly on url or on terminal : curl http://external-ip:5000
-curl http://a49a1e5dd65904caeb7f43598126d9c2-1778851358.us-east-1.elb.amazonaws.com:5000
+---
 
+> > > > > > > > > >  Prometheus Server Setup (on DigitalOcean Droplet) <<<<<<<<<<
 
+---
 
+28. **Create an Ubuntu Droplet** for Prometheus (t3.medium ≈ 2 vCPU/4 GB) with ports 9090 (HTTP) & 22 (SSH) open.
+29. SSH in & update:
 
+```bash
+ssh root@<droplet-ip>
+apt update && apt upgrade -y
+```
 
+30. Install Prometheus:
 
->>>>>>>>>> Prometheus Server Setup <<<<<<<<<<
+```bash
+useradd --no-create-home prometheus
+mkdir /etc/prometheus /var/lib/prometheus
+curl -LO https://github.com/prometheus/prometheus/releases/download/v2.46.0/prometheus-2.46.0.linux-amd64.tar.gz
+ tar -xzf prometheus-2.46.0.linux-amd64.tar.gz
+ mv prometheus-2.46.0.linux-amd64/prometheus /usr/local/bin/
+ mv prometheus-2.46.0.linux-amd64/promtool /usr/local/bin/
+ mv prometheus-2.46.0.linux-amd64/consoles /etc/prometheus
+ mv prometheus-2.46.0.linux-amd64/console_libraries /etc/prometheus
+```
 
-50. Launch an Ubuntu EC2 Instance for Prometheus: t3.medium,  20GB of disk space (general-purpose SSD), Security Group: Allow inbound access on ports: 9090 for Prometheus Web UI, 22 for SSH access
+31. **Configure Prometheus** `/etc/prometheus/prometheus.yml`:
 
-51. SSH into the EC2 Instance(optional or connect directly to ec2 server alternatively):
-ssh -i your-key.pem ubuntu@your-ec2-public-ip
-
-52. Update packages: sudo apt update && sudo apt upgrade -y
-
-53. Download Prometheus:
-wget https://github.com/prometheus/prometheus/releases/download/v2.46.0/prometheus-2.46.0.linux-amd64.tar.gz
-tar -xvzf prometheus-2.46.0.linux-amd64.tar.gz
-mv prometheus-2.46.0.linux-amd64 prometheus
-
-54. Move files to standard paths:
-sudo mv prometheus /etc/prometheus
-sudo mv /etc/prometheus/prometheus /usr/local/bin/
-
-55. Create Prometheus Configuration: 
->> Open the file for editing: sudo nano /etc/prometheus/prometheus.yml
->> Edit the File:
-
+```
 global:
   scrape_interval: 15s
-
 scrape_configs:
   - job_name: "flask-app"
     static_configs:
-      - targets: ["a6bf6255d5f61470c9782b8955c98271-1409247973.us-east-1.elb.amazonaws.com:5000"]  # Replace with your app's External IP
+      - targets: ["<external‑ip‑of‑k8s‑service>:5000"]
+```
 
+32. Create a systemd service & start Prometheus.
+    Verify at `http://<droplet-ip>:9090`.
 
+---
 
->> Save the File: ctrl+o -> enter -> ctrl+x
->> Verify the Changes: cat /etc/prometheus/prometheus.yml
+> > > > > > > > > >  Grafana Server Setup (on DigitalOcean Droplet) <<<<<<<<<<
 
-56. Locate the Prometheus Binary(Run the following command to find where the prometheus executable is installed):
-which prometheus
-This should return the full path to the prometheus binary, such as /usr/local/bin/Prometheus
+---
 
-57. Run Prometheus with the config file:
-/usr/local/bin/prometheus --config.file=/etc/prometheus/prometheus.yml
+33. Create a second Ubuntu Droplet (or reuse the Prometheus one) with port 3000 open.
+34. SSH & install Grafana:
 
+```bash
+apt update && apt upgrade -y
+wget https://dl.grafana.com/oss/release/grafana_10.1.5_amd64.deb
+apt install ./grafana_10.1.5_amd64.deb -y
+systemctl start grafana-server
+systemctl enable grafana-server
+```
 
+35. Access **http\://<droplet-ip>:3000** (admin / admin).
+36. **Add Prometheus data source** (`http://<prometheus-droplet-ip>:9090`) and build dashboards.
 
+---
 
->>>>>>>>>> Grafana Server Setup <<<<<<<<<<
+## AWS‑specific Cleanup ➜ DigitalOcean Cleanup
 
-58. Launch an Ubuntu EC2 Instance for Grafana: t3.medium,  20GB of disk space (general-purpose SSD), Security Group: Allow inbound access on ports: 3000 for Grafana Web UI, 22 for SSH access
+• **Delete K8s resources**
 
-59. SSH into the EC2 Instance(optional or connect directly to ec2 server alternatively):
-ssh -i your-key.pem ubuntu@your-ec2-public-ip
+```bash
+kubectl delete deployment flask-app
+kubectl delete service flask-app-service
+kubectl delete secret capstone-secret
+```
 
-60. Update and upgrade system packages:
-sudo apt update && sudo apt upgrade -y
+• **Destroy the DOKS cluster**
 
-61. Download Grafana: wget https://dl.grafana.com/oss/release/grafana_10.1.5_amd64.deb
-(this is a stable version for now; adjust the link if necessary.)
+```bash
+doctl kubernetes cluster delete flask-app-cluster
+```
 
-62. Install Grafana: sudo apt install ./grafana_10.1.5_amd64.deb -y
+• **Destroy Droplets** for Prometheus/Grafana via control panel or `doctl compute droplet delete`.
+• **Delete DO Spaces** objects if no longer needed.
+• **Prune registry images** (Docker Hub or DOCR).
 
-63. Start the Grafana service: sudo systemctl start grafana-server
-
-64. Enable Grafana to start on boot: sudo systemctl enable grafana-server
-
-65. Verify the service is running: sudo systemctl status grafana-server
-
-66. Open Grafana web UI: http://<ec2-public-ip>:3000 (username/pass - admin)
-
-67. Add Prometheus as a Data Source: http://54.81.71.206/:9090
-    click - Save and Test | Get started with building dashboards.
-
-
-
-----------------------------------------------------------------------------------
-
-AWS Resource Cleanup:
-
-* Delete deployment - kubectl delete deployment flask-app
-* Delete service - kubectl delete service flask-app-service
-* Delete env var - kubectl delete secret capstone-secret
-* Delete EKS Cluster - eksctl delete cluster --name flask-app-cluster --region us-east-1
-* Verify Cluster Deletion - eksctl get cluster --region us-east-1
-* Delete artifacts of ECR and S3 (optional - delete ECR and S3)
-* Validate if Cloud Formation stacks are deleted.
-* Confirm service termination on AWS support chat.
-
-
-
-
-----------------------------------------------------------------------------------
-
-
-***** How Is CloudFormation Related to EKS? *****
-
-What Is CloudFormation? 
-AWS CloudFormation is a service that helps define and provision AWS infrastructure as code using templates. It automates the process of creating and managing AWS resources.
-
-How Does It Relate to EKS?
-When you run eksctl, it generates CloudFormation templates behind the scenes to create:
-1. The EKS control plane.
-2. Node groups.
-CloudFormation ensures that these resources are created and managed as a stack (a logical grouping of resources).
-
-What Is a Stack in CloudFormation?
-A CloudFormation Stack is a collection of AWS resources (like VPCs, subnets, EC2 instances, etc.) managed as a single unit. For EKS:
-1. eksctl-flask-app-cluster-cluster stack: Creates the EKS control plane.
-2. eksctl-flask-app-cluster-nodegroup-flask-app-nodes stack: Creates the worker nodes.
-
-Each stack contains:
-
-1. A template defining the resources (YAML or JSON).
-2. Resource dependencies and configurations.
-
-----------------------------------------------------------------------------------
-
-----------------------------------------------------------------------------------
-
-Fleet Requests
-Definition: A Fleet Request is an AWS internal process for provisioning EC2 instances. When creating a NodeGroup, EKS uses an Auto Scaling Group (ASG) to request EC2 instances, which count as Fleet Requests.
-
-Why Relevant?: AWS imposes a limit on the number of Fleet Requests per account. If your account exceeds this limit (e.g., due to other active ASGs or EKS clusters), NodeGroup creation fails with the error "You’ve reached your quota for maximum Fleet Requests".
-----------------------------------------------------------------------------------
-
-----------------------------------------------------------------------------------
+---
 
 What is a PVC?
-1. PVC (PersistentVolumeClaim) is a request for storage by a Kubernetes application. It is bound to a PV (PersistentVolume), which is the actual storage resource.
-2. PVCs use StorageClasses to define how the volume should be provisioned (e.g., EBS volumes on AWS, NFS, etc.).
-3. When a pod is deployed and needs storage, it will request the storage defined in the PVC.
-
-----------------------------------------------------------------------------------
+A **PersistentVolumeClaim (PVC)** is a Kubernetes request for storage. It binds to a **PersistentVolume (PV)**—the actual disk resource. PVCs reference a **StorageClass** which defines *how* the volume is provisioned (e.g., DigitalOcean Block Storage, NFS). When a pod requires storage it mounts the volume claimed via the PVC.

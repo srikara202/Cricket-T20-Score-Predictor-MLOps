@@ -66,7 +66,7 @@ app = Flask(__name__)
 
 TEAMS = [
     "Australia","India","Bangladesh","New Zealand","South Africa",
-    "England","West Indies","Afghanistan","Pakistan","Sri Lanka"
+    "England","West Indies","Pakistan","Sri Lanka"
 ]
 
 with open('eligible_cities.txt', 'r') as file:

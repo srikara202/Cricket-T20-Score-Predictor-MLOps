@@ -50,7 +50,7 @@ def preprocess_dataframe(delivery_df: pd.DataFrame) -> pd.DataFrame:
         # 3. Filter to the 10 ICC full member teams
         valid_teams = {
             'Australia','India','Bangladesh','New Zealand','South Africa',
-            'England','West Indies','Afghanistan','Pakistan','Sri Lanka'
+            'England','West Indies','Pakistan','Sri Lanka'
         }
 
         before = len(df)

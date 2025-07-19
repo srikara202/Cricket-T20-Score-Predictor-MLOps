@@ -4,7 +4,7 @@ This project demonstrates a complete MLOps pipeline using cricket T20 score pred
 
 ## Why This Project?
 
-As a data scientist, I wanted to build something that goes beyond just training a model in a Jupyter notebook. This project demonstrates the entire machine learning lifecycle - from data ingestion to production monitoring. I chose cricket T20 score prediction because it provides an interesting real-world dataset, but the MLOps architecture could easily be adapted for any Machine Learning problem.
+As a learner of data science, I wanted to build something that goes beyond just training a model in a Jupyter notebook. This project demonstrates the entire machine learning lifecycle - from data ingestion to production monitoring. I chose cricket T20 score prediction because it provides an interesting real-world dataset, but the MLOps architecture could easily be adapted for any Machine Learning problem.
 
 Project is hosted at [http://144.126.254.108:5000/](http://144.126.254.108:5000/)
 

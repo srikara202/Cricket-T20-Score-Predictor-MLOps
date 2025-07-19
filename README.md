@@ -1,180 +1,199 @@
-# Cricket T20 Score Predictor — End‑to‑End MLOps Case Study
+# Cricket T20 Score Predictor - MLOps Implementation
 
-> **Live demo:** [http://144.126.254.108:5000/](http://144.126.254.108:5000/)
-> **Prometheus:** [http://64.225.85.3:9090/](http://64.225.85.3:9090/)  |  **Grafana:** [http://152.42.157.72/](http://152.42.157.72/)
+This project demonstrates a complete MLOps pipeline using cricket T20 score prediction as a practical use case. The primary focus is on showcasing modern MLOps practices, tools, and deployment strategies rather than the cricket prediction model itself.
 
----
+## Why This Project?
 
-## 1 • Why this project?
+As a data scientist, I wanted to build something that goes beyond just training a model in a Jupyter notebook. This project demonstrates the entire machine learning lifecycle - from data ingestion to production monitoring. I chose cricket T20 score prediction because it provides an interesting real-world dataset, but the MLOps architecture could easily be adapted for any Machine Learning problem.
 
-Cricket T20 scores swing wildly from ball to ball. Accurate, real‑time projections can help commentators, fantasy‑sports analysts, and data‑driven fans. This repository shows **how to turn a pure machine‑learning idea into an enterprise‑grade, cloud‑native product**—covering the full spectrum from raw data to monitored production API.
+Project is hosted at [http://144.126.254.108:5000/](http://144.126.254.108:5000/)
 
-*Everything is built and deployed on **DigitalOcean** to keep costs predictable, yet the workflow remains cloud‑agnostic.*
+## MLOps Architecture Overview
 
----
+This project implements a production-ready MLOps pipeline with the following components:
 
-## 2 • Key Skills & Technologies
+- **Experiment Management**: MLflow for tracking experiments, model versions, and artifacts
+- **Data Pipeline**: DVC for data versioning and pipeline automation
+- **Code Management**: Git/GitHub with proper branching and collaboration workflows
+- **CI/CD**: GitHub Actions for automated testing, building, and deployment
+- **Containerization**: Docker for consistent deployment environments
+- **Orchestration**: Kubernetes for scalable, cloud-native deployment
+- **Monitoring**: Prometheus + Grafana for observability and alerting
+- **Storage**: AWS S3-compatible storage for data artifacts
 
-| Domain               | Stack                                                                           |
-| -------------------- | ------------------------------------------------------------------------------- |
-| **Data Science**     | Pandas · NumPy · Seaborn · Matplotlib · XGBoost · Scikit‑Learn                  |
-| **MLOps**            | Cookiecutter Data‑Science · DVC · MLflow (⌂ DagsHub)                            |
-| **Dev & Ops**        | Docker · GitHub Actions CI/CD · DigitalOcean Kubernetes (DOKS) · DO Spaces (S3) |
-| **Observability**    | Prometheus (/metrics endpoint) · Grafana dashboards                             |
-| **Coding Standards** | Modular OOP Python (src/), logger + unit tests, pre‑commit, flake8              |
+## Project Structure
 
-Specifically regarding MLOps, the following libraries/toolstacks have been used:
+The project follows the Cookiecutter Data Science template with some modifications:
 
-1. Cookiecutter to create an empty project skeleton
-2. Git and GitHub for code versioning
-3. DVC for Data Versioning and Pipeline Automation
-4. MLFlow for model-versioning and storage
-5. AWS S3 for Data Storage
-6. Github Actions for Continuous Integration and Continuous Deployment
-7. Docker to containerize applications
-8. Kubernetes cluster deployment
-9. Prometheus-Grafana for monitoring and alerting
-
----
-
-## 3 • Data & Feature Engineering
-
-| Step                   | Details                                                                                                                                                   |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Source**             | Ball‑by‑ball YAML files for every men’s T20 International up to *July 2025* from **[Cricsheet](https://cricsheet.org/)**                                  |
-| **Raw → Bronze**       | Parse YAML ➜ tidy per‑ball DataFrame (overs, ball#, batter, bowler, runs, wickets)                                                                        |
-| **Silver**             | Added context features (current run‑rate, required run‑rate, wickets in hand, phase, venue‑encoded, opposition‑strength bins, Power‑play indicator, etc.) |
-| **Gold / Model input** | One‑hot / target‑oriented encoding, scaling via ColumnTransformer, saved as DVC artifact                                                                  |
-
-Each transformation stage is an explicit **DVC pipeline stage** (see `dvc.yaml`) so anyone can reproduce the exact training set with one command:
-
-```bash
-dvc repro   # DAG guarantees determinism
+```
+├── .github/workflows/          # GitHub Actions CI/CD pipelines
+├── src/                        # Source code modules
+│   ├── logger/                 # Structured logging utilities
+│   ├── data_ingestion.py       # Data collection and initial processing
+│   ├── data_preprocessing.py   # Data cleaning and validation
+│   ├── feature_engineering.py  # Feature creation and selection
+│   ├── model_building.py       # Model training pipeline
+│   ├── model_evaluation.py     # Model validation and metrics
+│   └── register_model.py       # Model registration to MLflow
+├── flask_app/                  # Production API service
+├── k8s/                        # Kubernetes deployment manifests
+├── tests/                      # Unit and integration tests
+├── dvc.yaml                    # DVC pipeline definition
+├── params.yaml                 # Configuration parameters
+└── requirements.txt            # Python dependencies
 ```
 
----
+## MLOps Tools and Technologies
 
-## 4 • Model Development
+### 1. Project Structure & Code Organization
+- **Cookiecutter Data Science**: Standardized project template for reproducibility
+- **Modular Python Architecture**: Object-oriented design with separation of concerns
+- **Git/GitHub**: Version control with feature branching and pull request workflows
 
-* **Algorithm:** XGBoost Regressor — chosen for non‑linear interactions & speed on tabular data.
-* **Validation:** Stratified 5‑fold split on match‑id to avoid data leakage across overs.
-* **Best run (logged in MLflow):**
+### 2. Data Management & Pipeline Automation
+- **DVC (Data Version Control)**: Tracks data versions, creates reproducible pipelines
+- **AWS S3**: Centralized data storage with versioning capabilities
+- **Pipeline Automation**: Automated data processing stages with dependency management
 
-  * *RMSE:* **4.052 runs**
-  * *MAE:* 1.906 runs
-  * *R²:* 0.985
-* Hyper‑parameters, metrics, artifacts, and the production model are versioned in **MLflow on DagsHub** (`runs/`, `models/`).
+### 3. Experiment Tracking & Model Management
+- **MLflow**: Comprehensive experiment tracking, model registry, and artifact storage
+- **DagsHub Integration**: Cloud-hosted MLflow with Git integration
+- **Model Versioning**: Automatic model versioning with metadata and lineage tracking
 
----
+### 4. Continuous Integration & Deployment
+- **GitHub Actions**: Automated CI/CD pipelines triggered by code changes
+- **Docker**: Containerized applications for consistent deployments
+- **Multi-stage Builds**: Optimized Docker images for production
 
-## 5 • Software Architecture
+### 5. Cloud-Native Deployment
+- **Kubernetes**: Container orchestration for scalability and reliability
+- **DigitalOcean Kubernetes (DOKS)**: Managed Kubernetes service
+- **LoadBalancer Services**: Automatic external IP assignment and traffic distribution
 
-```text
-src/
- ├── data_ingestion.py      # Cricsheet downloader & parser
- ├── data_preprocessing.py  # cleaning / formatting
- ├── feature_engineering.py # context feature builders
- ├── model_building.py      # training pipeline class
- ├── model_evaluation.py    # metric utils + plots
- ├── register_model.py      # push to MLflow
- ├── logger/                # structured logging
- └── config/params.yaml     # all hyper‑params & paths
-```
+### 6. Monitoring & Observability
+- **Prometheus**: Metrics collection and time-series database
+- **Grafana**: Visualization dashboards and alerting
+- **Custom Metrics**: Application-specific metrics for model performance monitoring
 
-Each module is **stateless & unit‑tested**, making local debugging and CI validation straightforward.
+## Key MLOps Practices Demonstrated
 
----
-
-## 6 • Serving Layer (Flask API)
-
-* `POST /predict` — JSON body with current match scenario ➜ returns projected innings total.
-* `GET /metrics` — Prometheus‑compatible exposition of latency, request‑count, and model‑score drift (inference vs. ground truth where available).
-
-The API is wrapped in a **Slim Alpine Docker image (\~120 MB)** built via multi‑stage build.
-
----
-
-## 7 • Cloud‑Native Deployment (DigitalOcean)
-
-### 7.1 Container Registry & CI
-
-1. GitHub Action (`ci.yaml`) lints, tests, builds the image, and pushes to **Docker Hub** (or **DOCR**).
-2. On successful push, the workflow triggers `kubectl apply` to update the live Deployment.
-
-### 7.2 Kubernetes Objects
-
-* **Deployment** (rolling updates, 1‑3 replicas)
-* **Service LoadBalancer** — automatic external IP (`144.126.254.108`)
-* **Secret** — DagsHub token & DVC remote creds injected as env vars
-* **PVC** (optional) — mounts model cache if warm‑start required
-
-All manifests live under `k8s/` and can be recreated with:
+### Reproducible Pipelines
+The entire data processing and model training pipeline is defined in `dvc.yaml`. Anyone can reproduce the exact same results by running:
 
 ```bash
-doctl kubernetes cluster create ...   # see projectflow.txt
-kubectl apply -f k8s/
+dvc repro
 ```
 
----
+This ensures that data transformations, feature engineering, and model training are completely reproducible across different environments.
 
-## 8 • Monitoring & Alerting
+### Experiment Tracking
+Every model training run is automatically logged to MLflow with:
+- Hyperparameters and configuration
+- Training and validation metrics
+- Model artifacts and dependencies
+- Data versioning information
 
-| Component      | What it does                                                                | Where                    |
-| -------------- | --------------------------------------------------------------------------- | ------------------------ |
-| **Prometheus** | Scrapes `/metrics` every 15 s; stores TS data                               | DO Droplet 1 (port 9090) |
-| **Grafana**    | Dashboards: traffic, p‑95 latency, error‑rate,<br> model drift, Pod CPU/RAM | DO Droplet 2 (port 3000) |
-| **Alerts**     | High latency, 5xx spike, RMSE drift > 20 %: Slack webhook                   | Prometheus rules         |
+### Automated CI/CD
+The GitHub Actions workflow automatically:
+1. Runs unit tests on every pull request
+2. Builds and tests Docker images
+3. Deploys to staging/production environments
+4. Updates Kubernetes deployments with zero downtime
 
-Both VMs are provisioned via simple user‑data scripts (see `infra/prometheus/` & `infra/grafana/`). No AWS CloudWatch or IAM overhead.
+### Infrastructure as Code
+All deployment configurations are version-controlled:
+- Kubernetes manifests define the production environment
+- Docker configurations ensure consistent runtime environments
+- DVC pipelines define data processing steps
 
----
+### Model Monitoring
+The production API exposes Prometheus metrics for:
+- Request latency and throughput
+- Model prediction confidence
+- Data drift detection
+- System resource utilization
 
-## 9 • Local Setup (Mac/Win/Linux)
+## Getting Started
 
+### Prerequisites
+- Python 3.10+
+- Docker Desktop
+- AWS CLI (for S3 access)
+- kubectl (for Kubernetes deployment)
+
+### Local Development
 ```bash
-git clone https://github.com/srikarashankara/cricket-t20-score-predictor.git
-cd cricket-t20-score-predictor
-conda env create -f environment.yml   # or use requirements.txt
+# Clone and setup environment
+git clone <repository-url>
+cd cricket-t20-score-predictor-mlops
+conda create -n atlas python=3.10
 conda activate atlas
+pip install -r requirements.txt
 
-# Re‑create data & train
- dvc pull               # if you just want the processed dataset
- dvc repro              # OR regenerate from raw YAMLs
+# Initialize DVC and run pipeline
+dvc init
+dvc repro
 
-# Run notebook experiments (optional)
- jupyter lab
-
-# Serve locally
- cd flask_app
- python app.py          # http://127.0.0.1:5000/docs
+# Start local API server
+cd flask_app
+python app.py
 ```
 
-Dockerised one‑liner:
+### Production Deployment
+The production deployment uses Kubernetes on DigitalOcean:
 
 ```bash
-docker run -p 8888:5000 srikarashankara/cricket-app:latest
+# Setup kubectl context
+doctl kubernetes cluster kubeconfig save flask-app-cluster
+
+# Deploy application
+kubectl apply -f k8s/
+
+# Check deployment status
+kubectl get pods,services
 ```
 
+## Monitoring and Observability
+
+The project includes comprehensive monitoring:
+
+- **Prometheus Server**: Collects metrics from the API endpoints
+- **Grafana Dashboards**: Visualizes system and model performance
+- **Alerting Rules**: Notifications for anomalies and performance issues
+
+Access monitoring:
+- Prometheus: `http://<prometheus-server>:9090`
+- Grafana: `http://<grafana-server>:3000`
+
+## What I Learned
+
+Building this project taught me several important lessons about MLOps:
+
+1. **Automation is Critical**: Manual deployment processes are error-prone and don't scale
+2. **Monitoring is Essential**: You can't manage what you don't measure
+3. **Infrastructure as Code**: Version-controlled infrastructure prevents configuration drift
+4. **Data Versioning**: Just as important as code versioning for ML projects
+5. **Security**: Proper secret management and access controls are non-negotiable
+
+## Future Improvements
+
+- **Multi-model Serving**: A/B testing framework for model comparisons
+- **Feature Store**: Centralized feature management with Redis/Feast
+- **Advanced Monitoring**: Data drift detection and model decay alerts
+- **Terraform**: Infrastructure provisioning automation
+- **Canary Deployments**: Risk-free production updates
+
+## Technical Specifications
+
+- **Model**: XGBoost Regressor with hyperparameter tuning
+- **API Framework**: Flask with Prometheus metrics integration
+- **Container Runtime**: Docker with Alpine Linux base
+- **Orchestration**: Kubernetes with rolling updates
+- **Storage**: S3-compatible object storage for artifacts
+- **Monitoring**: Prometheus + Grafana stack
+
+This project demonstrates that MLOps isn't just about deploying models - it's about building sustainable, scalable systems that can evolve with business needs while maintaining reliability and observability.
+
 ---
 
-## 10 • Re‑deploy in Your Own Cloud (Quick Guide)
-
-All commands (cluster creation, registry login, secrets) are captured step‑by‑step in **[`projectflow.txt`](projectflow.txt)**. Replace my domain names and token values with your own and run through Sections 24‑36.
-
----
-
-## 11 • Future Work
-
-* **Ensemble models** (LightGBM, CatBoost) with stacked meta‑learner.
-* **Real‑time feature store** (Redis Streams) to feed live broadcasts.
-* **Canary deployments** with Argo Rollouts to minimise risk.
-* **Terraform** modules to codify all DO resources.
-
----
-
-## 12 • Contact & Links
-
-* **LinkedIn:** [https://www.linkedin.com/in/srikarashankara/](https://www.linkedin.com/in/srikarashankara/)
-* **Email:** [mailto\:srikarashankara@outlook.com](mailto:srikarashankara@outlook.com)
-
----
+*Built to showcase MLOps best practices with real-world applicability*

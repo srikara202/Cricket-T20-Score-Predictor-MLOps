@@ -43,7 +43,7 @@ The project follows the Cookiecutter Data Science template with some modificatio
 └── requirements.txt            # Python dependencies
 ```
 
-## MLOps Tools and Technologies
+## MLOps Tools and Technologies Used
 
 ### 1. Project Structure & Code Organization
 - **Cookiecutter Data Science**: Standardized project template for reproducibility

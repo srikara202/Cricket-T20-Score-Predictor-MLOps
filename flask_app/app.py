@@ -1,3 +1,4 @@
+# flask_app/app.py
 #!/usr/bin/env python3
 import os
 import ast
@@ -8,6 +9,7 @@ from flask import Flask, render_template, request, jsonify
 import mlflow
 import dagshub
 from prometheus_client import Counter, Histogram, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+from mlflow import MlflowClient
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MLflow + DagsHub setup
@@ -24,31 +26,21 @@ repo_owner = "srikara202"
 repo_name = "Cricket-T20-Score-Predictor-MLOps"
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 
+
+# -------------------------------------------------------------------------------------
 # Below code block is for local use
 # -------------------------------------------------------------------------------------
 # mlflow.set_tracking_uri('https://dagshub.com/srikara202/Cricket-T20-Score-Predictor-MLOps.mlflow')
 # dagshub.init(repo_owner='srikara202', repo_name='Cricket-T20-Score-Predictor-MLOps', mlflow=True)
 # -------------------------------------------------------------------------------------
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Load model (only the version tagged stage=production)
-# ─────────────────────────────────────────────────────────────────────────────
-import logging
-import mlflow
-from mlflow import MlflowClient
 
 def get_model_version_by_stage(model_name: str, stage: str) -> str:
     client = MlflowClient()
-    # search all versions of this registered model
     all_versions = client.search_model_versions(f"name = '{model_name}'")
-    # filter to only those with tag "stage" = the desired stage
-    stage_versions = [
-        mv for mv in all_versions
-        if mv.tags.get("stage") == stage
-    ]
+    stage_versions = [mv for mv in all_versions if mv.tags.get("stage") == stage]
     if not stage_versions:
         raise ValueError(f"No model version found tagged stage='{stage}'")
-    # pick the one most recently updated
     chosen = max(stage_versions, key=lambda mv: mv.last_updated_timestamp)
     return chosen.version
 
@@ -56,11 +48,8 @@ MODEL_NAME    = "my_model"
 MODEL_VERSION = get_model_version_by_stage(MODEL_NAME, stage="production")
 MODEL_URI     = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logging.info("Loading %r model (version %s) from %s", "production", MODEL_VERSION, MODEL_URI)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.info("Loading production model version %s from %s", MODEL_VERSION, MODEL_URI)
 model = mlflow.pyfunc.load_model(MODEL_URI)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -80,24 +69,9 @@ TEAMS = [
     "England","West Indies","Afghanistan","Pakistan","Sri Lanka"
 ]
 
-file_path = 'eligible_cities.txt'
-my_list = []
-
-with open(file_path, 'r') as file:
-    for line in file:
-        my_list.append(line.strip()) # .strip() removes leading/trailing whitespace, including newline characters
-
+with open('eligible_cities.txt', 'r') as file:
+    my_list = [line.strip() for line in file]
 CITIES = ast.literal_eval(my_list[0])
-
-# CITIES = [
-#     "Colombo","Mirpur","Johannesburg","Dubai","Auckland","Cape Town",
-#     "London","Pallekele","Barbados","Sydney","Melbourne","Durban",
-#     "St Lucia","Wellington","Lauderhill","Hamilton","Centurion",
-#     "Manchester","Abu Dhabi","Mumbai","Nottingham","Southampton",
-#     "Mount Maunganui","Chittagong","Kolkata","Lahore","Delhi",
-#     "Nagpur","Chandigarh","Adelaide","Bangalore","St Kitts",
-#     "Cardiff","Christchurch","Trinidad"
-# ]
 
 @app.route("/", methods=["GET"])
 def home():
@@ -107,6 +81,7 @@ def home():
         teams=sorted(TEAMS),
         cities=sorted(CITIES),
         result=None,
+        error_message=None,
         batting_team=None,
         bowling_team=None,
         city=None,
@@ -124,10 +99,10 @@ def predict():
     REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
     start = time.time()
 
-    # JSON-based API
+    # JSON-based API (unchanged)...
     if request.is_json:
+        # ... existing JSON flow ...
         payload = request.get_json()
-        # fill in missing categories with defaults
         batting  = payload.get("batting_team", TEAMS[0])
         bowling  = payload.get("bowling_team", TEAMS[1] if TEAMS[1] != batting else TEAMS[0])
         city     = payload.get("city", CITIES[0])
@@ -139,18 +114,17 @@ def predict():
             last_five     = payload["last_five"]
         except KeyError as e:
             return jsonify({"error": f"Missing field {e}"}), 400
-
-        input_df = pd.DataFrame([{
-            "batting_team":  batting,
-            "bowling_team":  bowling,
-            "city":          city,
-            "current_score": current_score,
-            "balls_left":    balls_left,
-            "wickets_left":  wickets_left,
-            "crr":           crr,
-            "last_five":     last_five
-        }])
         try:
+            input_df = pd.DataFrame([{
+                "batting_team":  batting,
+                "bowling_team":  bowling,
+                "city":          city,
+                "current_score": current_score,
+                "balls_left":    balls_left,
+                "wickets_left":  wickets_left,
+                "crr":           crr,
+                "last_five":     last_five
+            }])
             pred = model.predict(input_df)[0]
             score = int(round(pred))
             return jsonify({"predicted_score": score})
@@ -158,7 +132,8 @@ def predict():
             logging.exception("Prediction error (JSON): %s", e)
             return jsonify({"error": str(e)}), 500
 
-    # form-based flow
+    # ─────────────────────────────────────────────────────────────────────────
+    # form-based flow with validation
     batting_team  = request.form.get("batting_team")
     bowling_team  = request.form.get("bowling_team")
     city          = request.form.get("city")
@@ -167,32 +142,54 @@ def predict():
     wickets_out   = request.form.get("wickets", type=int)
     last_five     = request.form.get("last_five", type=int)
 
-    try:
-        balls_bowled = int(overs_done * 6)
-        balls_left   = max(120 - balls_bowled, 0)
-        wickets_left = max(10 - wickets_out, 0)
-        crr = round(current_score / overs_done, 2) if overs_done > 0 else 0.0
+    error_message = None
+    # validate each field
+    if current_score is None:
+        error_message = "Current score is required and must be a number."
+    elif current_score < 0:
+        error_message = "Current score must be 0 or a positive integer."
+    elif overs_done is None:
+        error_message = "Overs done is required and must be a number."
+    elif overs_done < 5.0 or overs_done > 19.0:
+        error_message = "Overs done must be between 5 and 19 (inclusive)."
+    elif wickets_out is None:
+        error_message = "Wickets out is required and must be a whole number."
+    elif wickets_out < 0 or wickets_out > 9:
+        error_message = "Wickets out must be a whole number between 0 and 9."
+    elif last_five is None:
+        error_message = "Runs in last 5 overs is required and must be a number."
+    elif last_five < 0 or last_five > current_score:
+        error_message = "Runs in last 5 overs must be non-negative and no more than the current score."
 
-        input_df = pd.DataFrame([{
-            "batting_team":  batting_team,
-            "bowling_team":  bowling_team,
-            "city":          city,
-            "current_score": current_score,
-            "balls_left":    balls_left,
-            "wickets_left":  wickets_left,
-            "crr":           crr,
-            "last_five":     last_five
-        }])
-        pred = model.predict(input_df)[0]
-        result = int(round(pred))
-    except Exception as e:
-        logging.exception("Prediction error: %s", e)
-        result = f"Error: {e}"
+    result = None
+    if not error_message:
+        try:
+            balls_bowled = int(overs_done * 6)
+            balls_left   = max(120 - balls_bowled, 0)
+            wickets_left = max(10 - wickets_out, 0)
+            crr = round(current_score / overs_done, 2) if overs_done > 0 else 0.0
+
+            input_df = pd.DataFrame([{
+                "batting_team":  batting_team,
+                "bowling_team":  bowling_team,
+                "city":          city,
+                "current_score": current_score,
+                "balls_left":    balls_left,
+                "wickets_left":  wickets_left,
+                "crr":           crr,
+                "last_five":     last_five
+            }])
+            pred = model.predict(input_df)[0]
+            result = int(round(pred))
+        except Exception as e:
+            logging.exception("Prediction error: %s", e)
+            error_message = f"Prediction error: {e}"
 
     context = dict(
         teams=sorted(TEAMS),
         cities=sorted(CITIES),
         result=result,
+        error_message=error_message,
         batting_team=batting_team,
         bowling_team=bowling_team,
         city=city,

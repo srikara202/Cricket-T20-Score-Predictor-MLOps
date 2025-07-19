@@ -19,15 +19,15 @@
         min-height: 100vh;
       }
       .card {
-        background-color: #5e5d5d;         /* make card black */
-        color: #f8f8f8;                    /* ensure all text inside is white */
+        background-color: #5e5d5d;
+        color: #f8f8f8;
         border: none;
         border-radius: 1rem;
         box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.3);
       }
       .form-label {
         font-weight: 500;
-        color: #fff;                    /* reinforce white labels */
+        color: #fff;
       }
       .btn-primary {
         background-color: #c33764;
@@ -40,7 +40,7 @@
         padding: 1rem;
         margin-top: 1rem;
         text-align: center;
-        color: #fff;                    /* white text in result box */
+        color: #fff;
       }
       .footer-text {
         font-size: 0.9rem;
@@ -59,6 +59,13 @@
         <h1 class="display-4">International T20 Cricket Score Predictor</h1>
         <p class="lead">Instant estimates for your current innings.</p>
       </div>
+
+      {% if error_message %}
+        <div class="alert alert-danger text-center" role="alert">
+          {{ error_message }}
+        </div>
+      {% endif %}
+
       <div class="row justify-content-center">
         <div class="col-lg-8">
           <div class="card p-4 mb-4">
@@ -96,20 +103,61 @@
                 <div class="row g-3 mb-3">
                   <div class="col-md-4">
                     <label for="current_score" class="form-label">Current Score</label>
-                    <input type="number" id="current_score" name="current_score" class="form-control" value="{{ current_score or '' }}" required>
+                    <input
+                      type="number"
+                      id="current_score"
+                      name="current_score"
+                      class="form-control"
+                      value="{{ current_score or '' }}"
+                      required
+                      min="0"
+                      step="1"
+                    >
                   </div>
                   <div class="col-md-4">
                     <label for="overs" class="form-label">Overs Done</label>
-                    <input type="number" step="0.1" id="overs" name="overs" class="form-control" value="{{ overs or '' }}" required>
+                    <input
+                      type="number"
+                      id="overs"
+                      name="overs"
+                      class="form-control"
+                      value="{{ overs or '' }}"
+                      required
+                      min="5"
+                      max="19"
+                      step="0.1"
+                    >
                   </div>
                   <div class="col-md-4">
                     <label for="wickets" class="form-label">Wickets Out</label>
-                    <input type="number" id="wickets" name="wickets" class="form-control" value="{{ wickets or '' }}" required>
+                    <input
+                      type="number"
+                      id="wickets"
+                      name="wickets"
+                      class="form-control"
+                      value="{{ wickets or '' }}"
+                      required
+                      min="0"
+                      max="9"
+                      step="1"
+                    >
                   </div>
                 </div>
                 <div class="mb-3">
                   <label for="last_five" class="form-label">Runs in Last 5 Overs</label>
-                  <input type="number" id="last_five" name="last_five" class="form-control" value="{{ last_five or '' }}" required>
+                  <input
+                    type="number"
+                    id="last_five"
+                    name="last_five"
+                    class="form-control"
+                    value="{{ last_five or '' }}"
+                    required
+                    min="0"
+                    {% if current_score is not none %}
+                      max="{{ current_score }}"
+                    {% endif %}
+                    step="1"
+                  >
                 </div>
                 <div class="d-grid">
                   <button type="submit" class="btn btn-primary btn-lg">Predict Score</button>
@@ -126,8 +174,8 @@
           {% endif %}
 
           <div class="text-center mt-4 footer-text">
-            This is an end-to-end MLOps project containerized with docker and hosted on a DigitalOcean Kubernetes Cluster.  
-            See the source code at 
+            This is an end-to-end MLOps project containerized with docker and hosted on a DigitalOcean Kubernetes Cluster.<br>
+            See the source code at
             <a href="https://github.com/srikara202/Cricket-T20-Score-Predictor-MLOps" target="_blank">Github</a>.
           </div>
         </div>

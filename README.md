@@ -160,7 +160,8 @@ doctl registry login
 
 # build the image on the registry
 docker build -t flask-app:latest .
-          docker tag flask-app:latest <registry-name> flask-app:latest
+
+docker tag flask-app:latest <registry-name> flask-app:latest
 
 # Setup kubectl context
 doctl kubernetes cluster kubeconfig save <cluster-name>

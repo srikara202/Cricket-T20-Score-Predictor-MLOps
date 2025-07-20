@@ -195,5 +195,7 @@ Building this project taught me several important lessons about MLOps:
 This project demonstrates that MLOps isn't just about deploying models - it's about building sustainable, scalable systems that can evolve with business needs while maintaining reliability and observability.
 
 ---
-
+LinkedIn: https://www.linkedin.com/in/srikarashankara/
+Email: srikarashankara@outlook.com
+---
 *Built to showcase MLOps best practices with real-world applicability*

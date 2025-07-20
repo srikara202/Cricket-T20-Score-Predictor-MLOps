@@ -196,6 +196,7 @@ This project demonstrates that MLOps isn't just about deploying models - it's ab
 
 ---
 LinkedIn: https://www.linkedin.com/in/srikarashankara/
+
 Email: srikarashankara@outlook.com
 ---
 *Built to showcase MLOps best practices with real-world applicability*

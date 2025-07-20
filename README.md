@@ -124,12 +124,24 @@ The production API exposes Prometheus metrics for:
 ### Local Development
 ```bash
 # Clone and setup environment
-git clone <repository-url>
-cd cricket-t20-score-predictor-mlops
+git clone https://github.com/srikara202/Cricket-T20-Score-Predictor-MLOps.git
+cd Cricket-T20-Score-Predictor-MLOps
 conda create -n atlas python=3.10
 conda activate atlas
 pip install -r requirements.txt
 
+# Create a dagshub account and add its API key to the CAPSTONE_TEST environment variable
+
+# linux
+export CAPSTONE_TEST=[keyhere]
+
+# windows
+set CAPSTONE_TEST=[keyhere]
+```
+
+Download the t20 international YAML data (bunch of YAML files) from [cricsheet](https://cricsheet.org/downloads/), Set up AWS IAM user and S3 bucket and upload your data there. Add the environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Then:
+
+```bash
 # Initialize DVC and run pipeline
 dvc init
 dvc repro
@@ -143,11 +155,21 @@ python app.py
 The production deployment uses Kubernetes on DigitalOcean:
 
 ```bash
+# login
+doctl registry login
+
+# build the image on the registry
+docker build -t flask-app:latest .
+          docker tag flask-app:latest <registry-name> flask-app:latest
+
 # Setup kubectl context
-doctl kubernetes cluster kubeconfig save flask-app-cluster
+doctl kubernetes cluster kubeconfig save <cluster-name>
+
+# add dagshub API key to the cluster environment
+kubectl create secret generic capstone-secret --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} --dry-run=client -o yaml | kubectl apply -f - 
 
 # Deploy application
-kubectl apply -f k8s/
+kubectl apply -f deployment.yaml
 
 # Check deployment status
 kubectl get pods,services

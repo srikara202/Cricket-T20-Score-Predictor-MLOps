@@ -264,3 +264,7 @@ doctl kubernetes cluster delete flask-app-cluster
 
 What is a PVC?
 A **PersistentVolumeClaim (PVC)** is a Kubernetes request for storage. It binds to a **PersistentVolume (PV)**—the actual disk resource. PVCs reference a **StorageClass** which defines *how* the volume is provisioned (e.g., DigitalOcean Block Storage, NFS). When a pod requires storage it mounts the volume claimed via the PVC.
+
+
+disable app: kubectl scale deployment flask-app --replicas=0 -n default  
+enable app: kubectl scale deployment flask-app --replicas=2 -n default  

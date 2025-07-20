@@ -13,7 +13,7 @@ def preprocess_dataframe(delivery_df: pd.DataFrame) -> pd.DataFrame:
     Preprocess the delivery-level DataFrame:
       1. Derive 'bowling_team' by finding the non-batting side.
       2. Drop the original 'teams' column.
-      3. Filter to only the 10 international sides.
+      3. Filter to only the sides which have played enough matches.
       4. Select & return the final columns.
 
     Parameters
@@ -47,10 +47,36 @@ def preprocess_dataframe(delivery_df: pd.DataFrame) -> pd.DataFrame:
         df.drop(columns=['teams'], inplace=True)
         logging.info("Dropped 'teams' column")
 
-        # 3. Filter to the 10 ICC full member teams
+        # 3. Filter to the teams for which there is enough data
         valid_teams = {
-            'Australia','India','Bangladesh','New Zealand','South Africa',
-            'England','West Indies','Pakistan','Sri Lanka'
+            'India',
+            'Pakistan',
+            'New Zealand',
+            'Sri Lanka',
+            'South Africa',
+            'West Indies',
+            'Bangladesh',
+            'England',
+            'Australia',
+            'Zimbabwe',
+            'Ireland',
+            'United Arab Emirates',
+            'Malaysia',
+            'Netherlands',
+            'Hong Kong',
+            'Uganda',
+            'Nigeria',
+            'Scotland',
+            'Canada',
+            'Nepal',
+            'Kenya',
+            'Bahrain',
+            'Oman',
+            'Namibia',
+            'Malta',
+            'Rwanda',
+            'Japan',
+            'Singapore'
         }
 
         before = len(df)

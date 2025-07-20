@@ -65,8 +65,34 @@ REQUEST_LATENCY = Histogram("app_request_latency_seconds", "Request latency", ["
 app = Flask(__name__)
 
 TEAMS = [
-    "Australia","India","Bangladesh","New Zealand","South Africa",
-    "England","West Indies","Pakistan","Sri Lanka"
+    'India',
+    'Pakistan',
+    'New Zealand',
+    'Sri Lanka',
+    'South Africa',
+    'West Indies',
+    'Bangladesh',
+    'England',
+    'Australia',
+    'Zimbabwe',
+    'Ireland',
+    'United Arab Emirates',
+    'Malaysia',
+    'Netherlands',
+    'Hong Kong',
+    'Uganda',
+    'Nigeria',
+    'Scotland',
+    'Canada',
+    'Nepal',
+    'Kenya',
+    'Bahrain',
+    'Oman',
+    'Namibia',
+    'Malta',
+    'Rwanda',
+    'Japan',
+    'Singapore'
 ]
 
 with open('eligible_cities.txt', 'r') as file:

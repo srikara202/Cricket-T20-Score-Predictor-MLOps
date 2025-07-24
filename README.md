@@ -185,127 +185,20 @@ python app.py
 
 #### 2. CI/CD: build & deploy via GitHub Actions
 
-Create **`.github/workflows/ci.yaml`** in your repo:
+Create **`.github/workflows/ci.yaml`** in your repo (copy-paste from the yaml in this repo and make the necessary changes)
 
-```yaml
-name: CI → DOCR → DOKS
+**GitHub Secrets you’ll need:**
 
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install deps & run tests
-        run: |
-          pip install -r requirements.txt
-          pytest
-
-      # ── Build & Push Docker image ────────────────────────────────
-      - name: Log in to DOCR
-        uses: docker/login-action@v2
-        with:
-          registry: registry.digitalocean.com
-          username: ${{ secrets.DOCR_USERNAME }}
-          password: ${{ secrets.DOCR_TOKEN }}
-
-      - name: Build & push image
-        run: |
-          IMAGE=registry.digitalocean.com/flask-app-container-registry/flask-app:latest
-          docker build -t $IMAGE .
-          docker push    $IMAGE
-
-      # ── Deploy to DOKS ────────────────────────────────────────────
-      - name: Set up doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-      - name: Fetch kubeconfig
-        run: |
-          doctl kubernetes cluster kubeconfig save flask-app-cluster
-
-      - name: kubectl apply
-        run: |
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
-```
-
-> **GitHub Secrets you’ll need:**
->
-> * `DOCR_USERNAME` & `DOCR_TOKEN` → your DOCR creds
-> * `DIGITALOCEAN_ACCESS_TOKEN` → with read/write permissions on your DO resources
+* `DOCR_USERNAME` & `DOCR_TOKEN` → your DOCR creds
+* `DIGITALOCEAN_ACCESS_TOKEN` → with read/write permissions on your DO resources
 
 ---
 
 #### 3. Kubernetes manifests
 
-Put these under `k8s/` in your repo:
+Write a `deployment.yaml` file (copy-paste from this repo and make any changes necessary)
 
-##### `deployment.yaml`
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: flask-app
-  labels:
-    app: flask-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels: { app: flask-app }
-  template:
-    metadata:
-      labels: { app: flask-app }
-    spec:
-      containers:
-      - name: flask-app
-        image: registry.digitalocean.com/flask-app-container-registry/flask-app:latest
-        ports: [{ containerPort: 5000 }]
-        resources:
-          requests: { cpu: "250m", memory: "256Mi" }
-          limits:   { cpu: "1",    memory: "512Mi" }
-        readinessProbe:
-          httpGet: { path: "/", port: 5000 }
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        env:
-        - name: CAPSTONE_TEST
-          valueFrom:
-            secretKeyRef:
-              name: capstone-secret
-              key: CAPSTONE_TEST
-```
-
-##### `service.yaml`
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: flask-app-service
-  labels: { app: flask-app }
-spec:
-  type: LoadBalancer
-  selector: { app: flask-app }
-  ports:
-    - name: http
-      port: 5000
-      targetPort: 5000
-```
-
-1. **`kubectl apply -f k8s/`** will stand up your app behind a DO LoadBalancer.
+1. **`kubectl apply -f deployment.yaml`** will stand up your app behind a DO LoadBalancer.
 2. **`kubectl get svc`** will show you an **EXTERNAL-IP** you can browse at `http://<EXTERNAL-IP>:5000/`.
 
 ---

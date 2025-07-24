@@ -116,12 +116,14 @@ The production API exposes Prometheus metrics for:
 ## Getting Started
 
 ### Prerequisites
+
 - Python 3.10+
 - Docker Desktop
 - AWS CLI (for S3 access)
 - kubectl (for Kubernetes deployment)
 
-### Local Development
+### Local Deployment
+
 ```bash
 # Clone and setup environment
 git clone https://github.com/srikara202/Cricket-T20-Score-Predictor-MLOps.git
@@ -150,9 +152,10 @@ dvc repro
 cd flask_app
 python app.py
 ```
+
 ### Kubernetes CLuster Deployment and Monitoring
 
-
+---
 
 #### 1. Provision your Kubernetes infrastructure
 

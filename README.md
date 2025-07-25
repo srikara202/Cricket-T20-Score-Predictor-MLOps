@@ -36,7 +36,7 @@ The project follows the Cookiecutter Data Science template with some modificatio
 │   ├── model_evaluation.py     # Model validation and metrics
 │   └── register_model.py       # Model registration to MLflow
 ├── flask_app/                  # Production API service
-├── deployment.yaml             # Kubernetes deployment manifests
+├── deployment.yaml             # Kubernetes deployment and service manifests
 ├── tests/                      # Unit and integration tests
 ├── dvc.yaml                    # DVC pipeline definition
 ├── params.yaml                 # Configuration parameters
@@ -74,6 +74,49 @@ The project follows the Cookiecutter Data Science template with some modificatio
 - **Prometheus**: Metrics collection and time-series database
 - **Grafana**: Visualization dashboards and alerting
 - **Custom Metrics**: Application-specific metrics for model performance monitoring
+
+## CI/CD Pipeline Details
+
+The project implements a comprehensive CI/CD pipeline using GitHub Actions that automates testing, building, and deployment:
+
+### Pipeline Stages
+
+**1. Automated Testing:**
+- Runs DVC pipeline to validate data processing
+- Executes unit tests for model validation (`test_model.py`)
+- Tests Flask application endpoints (`test_flask_app.py`)
+- Only proceeds to deployment if all tests pass
+
+**2. Model Promotion:**
+- Automatically promotes successful models to production in MLflow
+- Ensures only validated models reach production environment
+
+**3. Container Building:**
+- Builds optimized Docker images using multi-stage builds
+- Tags and pushes to DigitalOcean Container Registry (DOCR)
+- Implements caching strategies for faster builds
+
+**4. Kubernetes Deployment:**
+- Performs rolling updates with zero downtime
+- Creates/updates Kubernetes secrets for environment variables
+- Automatically restarts deployments to pull latest images
+
+### Security & Configuration
+
+**Environment Variables Management:**
+- Sensitive data stored as GitHub Secrets
+- Kubernetes secrets created dynamically during deployment
+- No hardcoded credentials in codebase
+
+**Required GitHub Secrets:**
+```
+DO_TOKEN                 # DigitalOcean API access token
+DO_REGISTRY             # Container registry URL
+DO_CLUSTER_NAME         # Kubernetes cluster name
+AWS_ACCESS_KEY_ID       # S3 storage access
+AWS_SECRET_ACCESS_KEY   # S3 storage secret
+CAPSTONE_TEST           # MLflow/DagsHub authentication
+```
 
 ## Key MLOps Practices Demonstrated
 
@@ -153,108 +196,242 @@ cd flask_app
 python app.py
 ```
 
-### Kubernetes CLuster Deployment and Monitoring
+## DigitalOcean Infrastructure Setup & Deployment
 
----
+### Prerequisites
 
-#### 1. Provision your Kubernetes infrastructure
+Before deploying to DigitalOcean, ensure you have:
+- DigitalOcean account with billing enabled
+- `doctl` CLI tool installed
+- `kubectl` installed locally
+- Docker Desktop running
 
-1. **Create a DigitalOcean Kubernetes Cluster**
+### Step 1: Install and Configure DigitalOcean CLI
 
-   * In the DO Control Panel → Kubernetes → Create Cluster
-   * Region: e.g. **BLR1**
-   * Kubernetes version: **1.33.1-do.1**
-   * Node pool: 2 nodes × 2 vCPU, 4 GB RAM (you can size this however you like)
+**Install doctl:**
+```bash
+# macOS (Homebrew)
+brew install doctl
 
-2. **Create a Container Registry (DOCR)**
+# Windows (Chocolatey)
+choco install doctl
 
-   * In the DO Control Panel → Container Registry → Create Registry
-   * Name it e.g. `flask-app-container-registry`
-   * Region: **BLR1**
-   * Note your registry endpoint:
+# Linux (Snap)
+sudo snap install doctl
 
-     ```
-     registry.digitalocean.com/flask-app-container-registry
-     ```
+# Or download binary from: https://github.com/digitalocean/doctl/releases
+```
 
-3. **Grant your DO Kubernetes cluster pull-access to DOCR**
+**Authenticate with DigitalOcean:**
+```bash
+# Get your API token from: https://cloud.digitalocean.com/account/api/tokens
+doctl auth init --access-token YOUR_DO_TOKEN_HERE
 
-   * In the registry’s **Settings** tab → Integrations → Kubernetes → “Connect” → select your cluster → “Allow pull from this registry”
+# Verify authentication
+doctl account get
+```
 
----
+### Step 2: Create DigitalOcean Resources
 
-#### 2. CI/CD: build & deploy via GitHub Actions
+**Create Kubernetes Cluster (DOKS):**
+```bash
+# Create cluster with 2 nodes
+doctl kubernetes cluster create flask-app-cluster \
+    --region blr1 \
+    --version 1.33.1-do.1 \
+    --size s-2vcpu-4gb \
+    --node-pool "name=flask-app-nodes;count=2;size=s-2vcpu-4gb" \
+    --auto-upgrade=true \
+    --maintenance-window start=04:00,day=sunday
 
-Create **`.github/workflows/ci.yaml`** in your repo (copy-paste from the yaml in this repo and make the necessary changes)
+# This takes about 5-10 minutes to provision
+```
 
-**GitHub Secrets you’ll need:**
+**Create Container Registry (DOCR):**
+```bash
+# Create container registry
+doctl registry create flask-app-container-registry --region blr1
 
-* `DOCR_USERNAME` & `DOCR_TOKEN` → your DOCR creds
-* `DIGITALOCEAN_ACCESS_TOKEN` → with read/write permissions on your DO resources
+# Enable registry integration with your cluster
+doctl kubernetes cluster registry add flask-app-cluster flask-app-container-registry
+```
 
----
+**Configure kubectl:**
+```bash
+# Download cluster credentials
+doctl kubernetes cluster kubeconfig save flask-app-cluster
 
-#### 3. Kubernetes manifests
+# Verify cluster connection
+kubectl get nodes
+kubectl cluster-info
+```
 
-Write a `deployment.yaml` file (copy-paste from this repo and make any changes necessary)
+### Step 3: Configure GitHub Repository
 
-1. **`kubectl apply -f deployment.yaml`** will stand up your app behind a DO LoadBalancer.
-2. **`kubectl get svc`** will show you an **EXTERNAL-IP** you can browse at `http://<EXTERNAL-IP>:5000/`.
+**Required GitHub Secrets:**
 
----
-
-#### 4. Install Prometheus & Grafana via Helm
-
-We used the upstream **kube-prometheus-stack** chart (Prometheus Operator + Grafana):
+Navigate to your GitHub repo → Settings → Secrets and variables → Actions, and add:
 
 ```bash
-# 1. Add Helm repos
+# DigitalOcean secrets
+DO_TOKEN=your_digitalocean_api_token
+DO_REGISTRY=registry.digitalocean.com/flask-app-container-registry
+DO_CLUSTER_NAME=flask-app-cluster
+
+# AWS S3 secrets (for data storage)
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+
+# MLflow/DagsHub token
+CAPSTONE_TEST=your_dagshub_token
+```
+
+### Step 4: Deploy Application
+
+**Manual Deployment (First Time):**
+```bash
+# Clone your repo
+git clone https://github.com/your-username/Cricket-T20-Score-Predictor-MLOps.git
+cd Cricket-T20-Score-Predictor-MLOps
+
+# Apply Kubernetes manifests
+kubectl apply -f deployment.yaml
+
+# Check deployment status
+kubectl get pods -l app=flask-app
+kubectl get services
+
+# Get external IP (may take a few minutes)
+kubectl get svc flask-app-service -w
+```
+
+**Automatic Deployment via CI/CD:**
+- Simply push code to main branch
+- GitHub Actions will automatically test, build, and deploy
+- Monitor progress in Actions tab of your GitHub repo
+
+### Step 5: Set Up Monitoring Stack
+
+**Install Helm (if not already installed):**
+```bash
+# macOS
+brew install helm
+
+# Windows
+choco install kubernetes-helm
+
+# Linux
+curl https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz | tar xz
+sudo mv linux-amd64/helm /usr/local/bin/
+```
+
+**Deploy Prometheus & Grafana:**
+```bash
+# Add Prometheus Helm repository
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
-# 2. Create monitoring namespace
+# Create monitoring namespace
 kubectl create namespace monitoring
 
-# 3. Install the chart
-helm install prometheus \
-  prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  --set grafana.service.type=LoadBalancer \
-  --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.release=prometheus
+# Install kube-prometheus-stack
+helm install prometheus prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --set grafana.service.type=LoadBalancer \
+    --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.release=prometheus \
+    --set grafana.adminPassword=admin123 \
+    --wait
+
+# Get Grafana external IP
+kubectl -n monitoring get svc prometheus-grafana -w
 ```
 
-* This deploys:
+**Access Monitoring:**
+```bash
+# Get Grafana URL
+echo "Grafana: http://$(kubectl -n monitoring get svc prometheus-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}'):80"
 
-  * **Prometheus Operator**
-  * A **Prometheus** instance
-  * **Alertmanager**
-  * **Grafana** (with its own LoadBalancer service)
-  * Node Exporter, Kube-State-Metrics, and default and CRD-based ServiceMonitors
+# Default login: admin / admin123
+# Import dashboard ID: 315 (Kubernetes Cluster Monitoring)
+```
 
----
+### Step 6: Useful Commands
 
-#### 5. Access Grafana & build dashboards
+**Check Application Status:**
+```bash
+# View pods
+kubectl get pods -l app=flask-app
 
-1. **Find Grafana’s endpoint**:
+# View logs
+kubectl logs -l app=flask-app -f
 
-   ```bash
-   kubectl -n monitoring get svc prometheus-grafana
-   ```
+# Describe service
+kubectl describe svc flask-app-service
 
-   It will have a **LoadBalancer Ingress** IP.
+# Scale deployment
+kubectl scale deployment flask-app --replicas=3
+```
 
-2. **Browse** `http://<GRAFANA-LB-IP>:80/`
+**Monitoring Commands:**
+```bash
+# Check Prometheus targets
+kubectl -n monitoring port-forward svc/prometheus-operated 9090:9090
+# Visit: http://localhost:9090/targets
 
-   * Default login: `admin` / `prom-operator` (or whatever the chart notes)
-   * Add your Prometheus data source if it isn’t auto-configured:
+# Access Grafana locally
+kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80
+# Visit: http://localhost:3000
+```
 
-     * URL: `http://prometheus-operated.monitoring.svc.cluster.local:9090`
-   * Import community dashboards or create your own queries:
+### Step 7: Cost Management & Cleanup
 
-     ```promql
-     rate(http_requests_total{job="flask-app-service"}[1m])
-     ```
----
+**Monitor Costs:**
+- Check DigitalOcean billing dashboard regularly
+- DOKS cluster costs ~$24/month for 2 x 2vCPU nodes
+- LoadBalancer costs ~$12/month each
+- Container registry is free up to 5GB
+
+**Cleanup Resources (Important!):**
+```bash
+# Delete monitoring stack
+helm uninstall prometheus -n monitoring
+kubectl delete namespace monitoring
+
+# Delete application
+kubectl delete -f deployment.yaml
+
+# Delete cluster (THIS DELETES EVERYTHING!)
+doctl kubernetes cluster delete flask-app-cluster
+
+# Delete container registry
+doctl registry delete flask-app-container-registry
+
+# Verify cleanup
+doctl kubernetes cluster list
+doctl registry list
+```
+
+### Troubleshooting
+
+**Common Issues:**
+
+1. **Pods stuck in Pending:** Check node resources with `kubectl describe nodes`
+2. **ImagePullBackOff:** Verify DOCR integration with `kubectl get secrets`
+3. **Service no external IP:** Check LoadBalancer with `kubectl describe svc flask-app-service`
+4. **CI/CD fails:** Verify GitHub secrets are correctly set
+
+**Useful Debug Commands:**
+```bash
+# Check events
+kubectl get events --sort-by=.metadata.creationTimestamp
+
+# Debug pod issues
+kubectl describe pod <pod-name>
+kubectl logs <pod-name> --previous
+
+# Test connectivity
+kubectl run debug --image=busybox -it --rm -- /bin/sh
+```
 
 ## Monitoring and Observability
 

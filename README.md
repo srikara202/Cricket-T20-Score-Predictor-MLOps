@@ -1,473 +1,583 @@
-# Cricket T20 Score Predictor - MLOps Implementation
+# Cricket T20 Score Predictor - End-to-End MLOps Project
 
-This project demonstrates a complete MLOps pipeline using cricket T20 score prediction as a practical use case. The primary focus is on showcasing modern MLOps practices, tools, and deployment strategies rather than the cricket prediction model itself.
+This repository is an end-to-end MLOps project built around one focused machine learning task: predicting the eventual first-innings total in an international men's T20 cricket match from the current innings state. The regression model itself is intentionally conventional. The strength of the project is the lifecycle around it: S3-backed data ingestion, DVC pipeline orchestration, feature engineering, experiment tracking in MLflow via DagsHub, model registration and promotion, a Flask inference layer that resolves the latest production-tagged model at startup, and deployment-oriented packaging with Docker, GitHub Actions, and Kubernetes.
 
-## Why This Project?
+## Table of Contents
 
-As a learner of data science, I wanted to build something that goes beyond just training a model in a Jupyter notebook. This project demonstrates the entire machine learning lifecycle - from data ingestion to production monitoring. I chose cricket T20 score prediction because it provides an interesting real-world dataset, but the MLOps architecture could easily be adapted for any Machine Learning problem.
+- [Key Highlights](#key-highlights)
+- [Problem Statement](#problem-statement)
+- [What the Model Predicts](#what-the-model-predicts)
+- [What This Project Is Really About](#what-this-project-is-really-about)
+- [End-to-End Architecture / Pipeline Overview](#end-to-end-architecture--pipeline-overview)
+- [Repository Structure](#repository-structure)
+- [Data Pipeline](#data-pipeline)
+- [Feature Engineering](#feature-engineering)
+- [Modeling Approach](#modeling-approach)
+- [Experiment Tracking and Registry](#experiment-tracking-and-registry)
+- [Model Promotion Workflow](#model-promotion-workflow)
+- [Serving and Inference API](#serving-and-inference-api)
+- [Deployment](#deployment)
+- [Monitoring / Observability](#monitoring--observability)
+- [Tech Stack](#tech-stack)
+- [How to Run Locally](#how-to-run-locally)
+- [How to Reproduce the Pipeline](#how-to-reproduce-the-pipeline)
+- [Environment Variables / Secrets Needed](#environment-variables--secrets-needed)
+- [Example Usage](#example-usage)
+- [Testing](#testing)
+- [Known Limitations / Current Caveats](#known-limitations--current-caveats)
+- [Future Improvements](#future-improvements)
+- [Conclusion](#conclusion)
 
-Project is hosted at [http://144.126.254.108:5000/](http://144.126.254.108:5000/) (disabled now due to heavy billing from DigitalOcean)
+## Key Highlights
 
-## MLOps Architecture Overview
+- End-to-end DVC pipeline from raw YAML scorecards to model registration.
+- Supervised learning setup that predicts eventual first-innings total from current match state.
+- Experiment tracking, artifact logging, and model registry integration through MLflow on DagsHub.
+- Registry-driven model serving: the Flask app loads the latest `production`-tagged model from MLflow at startup.
+- Lightweight inference container that packages the serving layer separately from the training environment.
+- GitHub Actions workflow that automates pipeline execution, tests, model promotion, container build, and Kubernetes deployment on push.
+- Application-side Prometheus instrumentation exposed at `/metrics`.
 
-This project implements a production-ready MLOps pipeline with the following components:
+## Problem Statement
 
-- **Experiment Management**: MLflow for tracking experiments, model versions, and artifacts
-- **Data Pipeline**: DVC for data versioning and pipeline automation
-- **Code Management**: Git/GitHub with proper branching and collaboration workflows
-- **CI/CD**: GitHub Actions for automated testing, building, and deployment
-- **Containerization**: Docker for consistent deployment environments
-- **Orchestration**: Kubernetes for scalable, cloud-native deployment
-- **Monitoring**: Prometheus + Grafana for observability and alerting
-- **Storage**: AWS S3-compatible storage for data artifacts
+In a T20 match, the projected first-innings total changes ball by ball as score, overs, wickets, venue context, and recent scoring momentum evolve. This project frames that as a supervised regression problem:
 
-## Project Structure
+> Given the current state of the first innings, predict the eventual final total.
 
-The project follows the Cookiecutter Data Science template with some modifications:
+That framing makes the task practical for both modeling and operationalization. Each training row captures a partial innings state, and the target is the final score eventually reached at the end of the innings.
 
-```
-├── .github/workflows/          # GitHub Actions CI/CD pipelines
-├── src/                        # Source code modules
-│   ├── logger/                 # Structured logging utilities
-│   ├── data_ingestion.py       # Data collection and initial processing
-│   ├── data_preprocessing.py   # Data cleaning and validation
-│   ├── feature_engineering.py  # Feature creation and selection
-│   ├── model_building.py       # Model training pipeline
-│   ├── model_evaluation.py     # Model validation and metrics
-│   └── register_model.py       # Model registration to MLflow
-├── flask_app/                  # Production API service
-├── deployment.yaml             # Kubernetes deployment and service manifests
-├── tests/                      # Unit and integration tests
-├── dvc.yaml                    # DVC pipeline definition
-├── params.yaml                 # Configuration parameters
-└── requirements.txt            # Python dependencies
-```
+## What the Model Predicts
 
-## MLOps Tools and Technologies Used
+| In scope | Out of scope |
+| --- | --- |
+| First-innings total score | Second-innings chase outcome |
+| Men's T20 international match context | Win probability |
+| Score projection from current innings state | Player-level outcomes |
 
-### 1. Project Structure & Code Organization
-- **Cookiecutter Data Science**: Standardized project template for reproducibility
-- **Modular Python Architecture**: Object-oriented design with separation of concerns
-- **Git/GitHub**: Version control with feature branching and pull request workflows
+## What This Project Is Really About
 
-### 2. Data Management & Pipeline Automation
-- **DVC (Data Version Control)**: Tracks data versions, creates reproducible pipelines
-- **AWS S3**: Centralized data storage with versioning capabilities
-- **Pipeline Automation**: Automated data processing stages with dependency management
+This repository is best understood as an MLOps portfolio project rather than a novel modeling project. The underlying estimator is an `XGBRegressor` wrapped in a scikit-learn pipeline. The more interesting engineering work is around how data is ingested, transformed, versioned, evaluated, tracked, promoted, and served in a deployment-oriented workflow.
 
-### 3. Experiment Tracking & Model Management
-- **MLflow**: Comprehensive experiment tracking, model registry, and artifact storage
-- **DagsHub Integration**: Cloud-hosted MLflow with Git integration
-- **Model Versioning**: Automatic model versioning with metadata and lineage tracking
+The project demonstrates a production-style ML lifecycle:
 
-### 4. Continuous Integration & Deployment
-- **GitHub Actions**: Automated CI/CD pipelines triggered by code changes
-- **Docker**: Containerized applications for consistent deployments
-- **Multi-stage Builds**: Optimized Docker images for production
+- data ingestion from S3-compatible storage
+- reproducible DVC stages
+- feature generation from live match state
+- tracked experiments and model artifacts
+- registry-based promotion using explicit tags
+- serving through a Flask app and JSON API
+- deployment via Docker, GitHub Actions, and Kubernetes
+- operational visibility through Prometheus metrics
 
-### 5. Cloud-Native Deployment
-- **Kubernetes**: Container orchestration for scalability and reliability
-- **DigitalOcean Kubernetes (DOKS)**: Managed Kubernetes service
-- **LoadBalancer Services**: Automatic external IP assignment and traffic distribution
+## End-to-End Architecture / Pipeline Overview
 
-### 6. Monitoring & Observability
-- **Prometheus**: Metrics collection and time-series database
-- **Grafana**: Visualization dashboards and alerting
-- **Custom Metrics**: Application-specific metrics for model performance monitoring
-
-## CI/CD Pipeline Details
-
-The project implements a comprehensive CI/CD pipeline using GitHub Actions that automates testing, building, and deployment:
-
-### Pipeline Stages
-
-**1. Automated Testing:**
-- Runs DVC pipeline to validate data processing
-- Executes unit tests for model validation (`test_model.py`)
-- Tests Flask application endpoints (`test_flask_app.py`)
-- Only proceeds to deployment if all tests pass
-
-**2. Model Promotion:**
-- Automatically promotes successful models to production in MLflow
-- Ensures only validated models reach production environment
-
-**3. Container Building:**
-- Builds optimized Docker images using multi-stage builds
-- Tags and pushes to DigitalOcean Container Registry (DOCR)
-- Implements caching strategies for faster builds
-
-**4. Kubernetes Deployment:**
-- Performs rolling updates with zero downtime
-- Creates/updates Kubernetes secrets for environment variables
-- Automatically restarts deployments to pull latest images
-
-### Security & Configuration
-
-**Environment Variables Management:**
-- Sensitive data stored as GitHub Secrets
-- Kubernetes secrets created dynamically during deployment
-- No hardcoded credentials in codebase
-
-**Required GitHub Secrets:**
-```
-DO_TOKEN                 # DigitalOcean API access token
-DO_REGISTRY             # Container registry URL
-DO_CLUSTER_NAME         # Kubernetes cluster name
-AWS_ACCESS_KEY_ID       # S3 storage access
-AWS_SECRET_ACCESS_KEY   # S3 storage secret
-CAPSTONE_TEST           # MLflow/DagsHub authentication
+```mermaid
+flowchart LR
+    A[S3 bucket and prefix: t20s YAML scorecards] --> B[data_ingestion]
+    B --> C[data_preprocessing]
+    C --> D[feature_engineering]
+    D --> E[model_building]
+    E --> F[model_evaluation]
+    F --> G[model_registration]
+    G --> H[MLflow / DagsHub model registry]
+    H --> I[scripts/promote_model.py]
+    I --> J[production-tagged model version]
+    J --> K[Flask app]
+    K --> L[/predict]
+    K --> M[/metrics]
+    N[GitHub Actions on push] --> B
+    N --> O[Docker image build]
+    O --> P[DigitalOcean Container Registry]
+    P --> Q[Kubernetes deployment]
+    Q --> K
 ```
 
-## Key MLOps Practices Demonstrated
+At a high level:
 
-### Reproducible Pipelines
-The entire data processing and model training pipeline is defined in `dvc.yaml`. Anyone can reproduce the exact same results by running:
+1. Raw match scorecards are read from S3-compatible object storage.
+2. DVC orchestrates ingestion, preprocessing, feature engineering, training, evaluation, and model registration.
+3. Evaluation logs metrics and artifacts to MLflow on DagsHub.
+4. Registered models are tagged with a custom `stage` model-version tag.
+5. The latest `stage=production` model is loaded by the Flask app at startup.
+6. The serving layer exposes a browser form, a JSON prediction endpoint, and Prometheus metrics.
 
-```bash
-dvc repro
+## Repository Structure
+
+The repository follows a Cookiecutter Data Science-inspired layout, with the project-specific MLOps logic concentrated in the data, model, serving, and deployment paths:
+
+```text
+.
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yaml
+|-- flask_app/
+|   |-- app.py
+|   |-- eligible_cities.txt
+|   |-- requirements.txt
+|   `-- templates/
+|       `-- index.html
+|-- notebooks/
+|   |-- life-cycle.ipynb
+|   `-- t20s/
+|-- scripts/
+|   `-- promote_model.py
+|-- src/
+|   |-- connections/
+|   |-- data/
+|   |-- features/
+|   `-- model/
+|-- tests/
+|-- Dockerfile
+|-- deployment.yaml
+|-- dvc.yaml
+|-- params.yaml
+`-- README.md
 ```
 
-This ensures that data transformations, feature engineering, and model training are completely reproducible across different environments.
+Related supporting files such as `docs/`, `Makefile`, `setup.py`, and `test_environment.py` reflect the repo's evolution from a project scaffold into a more complete MLOps portfolio project.
 
-### Experiment Tracking
-Every model training run is automatically logged to MLflow with:
-- Hyperparameters and configuration
-- Training and validation metrics
-- Model artifacts and dependencies
-- Data versioning information
+## Data Pipeline
 
-### Automated CI/CD
-The GitHub Actions workflow automatically:
-1. Runs unit tests on every pull request
-2. Builds and tests Docker images
-3. Deploys to staging/production environments
-4. Updates Kubernetes deployments with zero downtime
+The pipeline is defined in `dvc.yaml` and is organized as sequential stages:
 
-### Infrastructure as Code
-All deployment configurations are version-controlled:
-- Kubernetes manifests define the production environment
-- Docker configurations ensure consistent runtime environments
-- DVC pipelines define data processing steps
+| DVC stage | Script | What it does | Primary outputs |
+| --- | --- | --- | --- |
+| `data_ingestion` | `src/data/data_ingestion.py` | Fetches raw YAML scorecards from the `t20s` S3-compatible bucket/prefix, flattens scorecards, filters to men's 20-over matches, and extracts first-innings delivery records | `data/raw/data.csv` |
+| `data_preprocessing` | `src/data/data_preprocessing.py` | Derives `bowling_team`, drops the original `teams` list, and filters to a curated set of supported international sides | `data/interim/interim_data.csv` |
+| `feature_engineering` | `src/features/feature_engineering.py` | Builds model-ready match-state features, filters low-volume cities, shuffles the dataset, and creates the train/test split | `data/processed/train_final.csv`, `data/processed/test_final.csv`, `eligible_cities.txt`, `flask_app/eligible_cities.txt` |
+| `model_building` | `src/model/model_building.py` | Trains the scikit-learn pipeline with `XGBRegressor` and serializes the model | `models/model.pkl` |
+| `model_evaluation` | `src/model/model_evaluation.py` | Evaluates the trained model, saves metrics, and logs artifacts to MLflow | `reports/metrics.json`, `reports/experiment_info.json` |
+| `model_registration` | `src/model/register_model.py` | Registers the model in MLflow and tags the new version as `stage=staging` | MLflow model version |
 
-### Model Monitoring
-The production API exposes Prometheus metrics for:
-- Request latency and throughput
-- Model prediction confidence
-- Data drift detection
-- System resource utilization
+### Ingestion specifics
 
-## Getting Started
+The ingestion code is focused on the exact supervised learning problem this repo solves:
+
+- raw source format: YAML cricket scorecards
+- storage location: S3-compatible object storage
+- match filter: men's matches with `info.overs == 20`
+- innings filter: first innings only
+- granularity after extraction: one row per delivery
+
+Examples of fields present in the extracted delivery-level data include:
+
+- `match_id`
+- `batting_team`
+- `batsman`
+- `bowler`
+- `runs`
+- `player_dismissed`
+- `city`
+- `venue`
+
+The repo also contains sample YAML files under `notebooks/t20s/`, which are useful for inspection, but the executable ingestion path expects object storage access.
+
+## Feature Engineering
+
+Feature engineering converts raw delivery records into a supervised dataset where each row represents the current innings state and the label is the final total score.
+
+### Engineered features
+
+| Feature | Meaning |
+| --- | --- |
+| `batting_team` | Team currently batting |
+| `bowling_team` | Opponent team derived from the match teams list |
+| `city` | Match city, with missing values imputed from venue |
+| `current_score` | Runs scored so far in the innings |
+| `balls_left` | Deliveries remaining in a 20-over innings |
+| `wickets_left` | Remaining wickets after cumulative dismissals |
+| `crr` | Current run rate |
+| `last_five` | Rolling runs scored over the last 30 balls |
+
+### Target
+
+The target column is `total_runs`, computed as the final first-innings score for the match.
+
+### Why `eligible_cities.txt` exists
+
+The feature engineering stage filters out low-volume cities and writes the supported city list to:
+
+- `eligible_cities.txt`
+- `flask_app/eligible_cities.txt`
+
+This file is an important bridge artifact between training and serving. It keeps the Flask UI and containerized app aligned with the cities seen often enough during training to support inference reliably.
+
+In practical terms, the project learns from rows of the form:
+
+```text
+current innings state -> eventual first-innings total
+```
+
+## Modeling Approach
+
+Model training lives in `src/model/model_building.py`.
+
+### Estimator design
+
+- model type: `XGBRegressor`
+- pipeline wrapper: scikit-learn `Pipeline`
+- categorical preprocessing: `ColumnTransformer` with `OneHotEncoder`
+- categorical features encoded: `batting_team`, `bowling_team`, `city`
+- numerical preprocessing: remaining features passed through and then scaled with `StandardScaler`
+- hyperparameter source: `params.yaml`
+
+This is a pragmatic modeling setup rather than an attempt at algorithmic novelty. The repo uses a proven gradient-boosting regressor and focuses engineering effort on the lifecycle around it.
+
+## Experiment Tracking and Registry
+
+Experiment tracking is implemented in `src/model/model_evaluation.py` using MLflow with DagsHub as the remote tracking backend.
+
+### What gets tracked
+
+- evaluation metrics: `R2`, `MAE`, `RMSE`
+- model parameters
+- serialized MLflow model artifacts
+- experiment metadata needed for later registration
+
+### Authentication model
+
+The code expects a `CAPSTONE_TEST` environment variable and uses it to set:
+
+- `MLFLOW_TRACKING_USERNAME`
+- `MLFLOW_TRACKING_PASSWORD`
+
+That token is required for:
+
+- logging evaluation metrics and artifacts to MLflow
+- accessing the registry from the serving app
+- running tests that load models from DagsHub/MLflow
+
+### Registry contract
+
+- registered model name: `my_model`
+- custom model-version tag key: `stage`
+- staging value: `staging`
+- production value: `production`
+
+The project uses explicit model-version tags instead of relying on classic MLflow stage transitions.
+
+## Model Promotion Workflow
+
+Model promotion is handled by `scripts/promote_model.py`.
+
+The workflow is:
+
+1. Find the newest model version tagged `stage=staging`.
+2. Remove the `stage=production` tag from any currently promoted version.
+3. Tag the selected staging version as `stage=production`.
+
+This promotion scheme matters because the serving layer is registry-driven. The app does not depend on a hardcoded local model path for inference. Instead, it resolves the latest production-tagged model version from MLflow at startup.
+
+## Serving and Inference API
+
+The serving layer lives in `flask_app/app.py`, with the HTML interface defined in `flask_app/templates/index.html`.
+
+### Startup behavior
+
+On startup, the Flask app:
+
+- authenticates to DagsHub / MLflow using `CAPSTONE_TEST`
+- finds the latest version of `my_model` tagged `stage=production`
+- loads that model through MLflow's Python function interface
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/` | `GET` | Render the HTML prediction form |
+| `/predict` | `POST` | Serve predictions from either form data or JSON |
+| `/metrics` | `GET` | Expose Prometheus metrics |
+
+### Browser form flow
+
+The form-based UI accepts:
+
+- batting team
+- bowling team
+- city
+- current score
+- overs done
+- wickets out
+- runs in last 5 overs
+
+Before inference, the app converts form values into the feature space used during training:
+
+- `overs` -> `balls_left`
+- `wickets out` -> `wickets_left`
+- `current_score / overs_done` -> `crr`
+
+### JSON API flow
+
+The JSON API is slightly lower level than the browser form. It expects model-ready fields such as:
+
+- `batting_team`
+- `bowling_team`
+- `city`
+- `current_score`
+- `balls_left`
+- `wickets_left`
+- `crr`
+- `last_five`
+
+The response is a rounded score prediction.
+
+## Deployment
+
+Deployment is represented in the repo as a DigitalOcean-targeted CI/CD path rather than a complete platform blueprint.
+
+### What is implemented in the repository
+
+- GitHub Actions workflow: `.github/workflows/ci.yaml`
+- container build: `Dockerfile`
+- Kubernetes manifest: `deployment.yaml`
+
+### CI/CD flow on push
+
+The GitHub Actions workflow currently:
+
+1. checks out the repository
+2. installs Python dependencies
+3. runs `dvc repro`
+4. runs the model tests
+5. promotes the latest staging model to production
+6. runs Flask app tests
+7. builds the Docker image
+8. pushes the image to DigitalOcean Container Registry
+9. applies the Kubernetes manifest and restarts the deployment
+
+### Containerization details
+
+The Docker image is intentionally slim:
+
+- base image: `python:3.10-slim`
+- copied code: only `flask_app/`
+- install source: `flask_app/requirements.txt`
+- runtime server: `gunicorn`
+
+This keeps serving lighter than the full training environment. The image does not bundle a local production model artifact. Instead, the app pulls the current production-tagged model from MLflow/DagsHub at startup.
+
+### Kubernetes details
+
+`deployment.yaml` defines:
+
+- a deployment with `2` replicas
+- a `LoadBalancer` service
+- runtime injection of `CAPSTONE_TEST` from a Kubernetes secret
+
+## Monitoring / Observability
+
+Application-side Prometheus instrumentation is implemented directly in the Flask app using `prometheus_client`.
+
+The app exports:
+
+- request count
+- request latency
+
+Metrics are exposed at:
+
+```text
+GET /metrics
+```
+
+The repo's current monitoring story is intentionally described in an honest way:
+
+- implemented in code: Prometheus-compatible application metrics
+- documented operationally: Prometheus/Grafana setup and usage notes
+- not fully present as code: a complete monitoring stack expressed as repository-managed infrastructure manifests
+
+## Tech Stack
+
+| Area | Tools |
+| --- | --- |
+| Language | Python |
+| Data access | `boto3`, YAML scorecards, S3-compatible object storage |
+| Pipeline orchestration | DVC |
+| Data processing | pandas, NumPy |
+| Modeling | scikit-learn, XGBoost |
+| Experiment tracking and registry | MLflow, DagsHub |
+| Serving | Flask, Jinja2, Gunicorn |
+| Observability | `prometheus_client` |
+| Containerization | Docker |
+| Deployment | GitHub Actions, DigitalOcean Container Registry, Kubernetes |
+| Testing | Python `unittest` |
+
+## How to Run Locally
 
 ### Prerequisites
 
-- Python 3.10+
-- Docker Desktop
-- AWS CLI (for S3 access)
-- kubectl (for Kubernetes deployment)
+- Python 3.10 is the safest baseline because the CI workflow and Docker image both use it.
+- Access to the raw YAML scorecards in the S3-compatible `t20s` bucket/prefix.
+- A DagsHub / MLflow token stored in `CAPSTONE_TEST`.
 
-### Local Deployment
+### 1. Install dependencies
 
 ```bash
-# Clone and setup environment
 git clone https://github.com/srikara202/Cricket-T20-Score-Predictor-MLOps.git
 cd Cricket-T20-Score-Predictor-MLOps
-conda create -n atlas python=3.10
-conda activate atlas
 pip install -r requirements.txt
-
-# Create a dagshub account and add its API key to the CAPSTONE_TEST environment variable
-
-# linux
-export CAPSTONE_TEST=[keyhere]
-
-# windows
-set CAPSTONE_TEST=[keyhere]
 ```
 
-Download the t20 international YAML data (bunch of YAML files) from [cricsheet](https://cricsheet.org/downloads/), Set up AWS IAM user and S3 bucket and upload your data there. Add the environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Then:
+### 2. Set required environment variables
+
+Bash:
 
 ```bash
-# Initialize DVC and run pipeline
-dvc init
-dvc repro
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export CAPSTONE_TEST=your_dagshub_token
+```
 
-# Start local API server
+PowerShell:
+
+```powershell
+$env:AWS_ACCESS_KEY_ID="your_access_key"
+$env:AWS_SECRET_ACCESS_KEY="your_secret_key"
+$env:CAPSTONE_TEST="your_dagshub_token"
+```
+
+### 3. Reproduce the pipeline
+
+```bash
+dvc repro
+```
+
+### 4. Start the Flask app
+
+```bash
 cd flask_app
 python app.py
 ```
 
-## DigitalOcean Infrastructure Setup & Deployment
+Then open:
 
-### Prerequisites
-
-Before deploying to DigitalOcean, ensure you have:
-- DigitalOcean account with billing enabled
-- `doctl` CLI tool installed
-- `kubectl` installed locally
-- Docker Desktop running
-
-### Step 1: Install and Configure DigitalOcean CLI
-
-**Install doctl:**
-```bash
-# macOS (Homebrew)
-brew install doctl
-
-# Windows (Chocolatey)
-choco install doctl
-
-# Linux (Snap)
-sudo snap install doctl
-
-# Or download binary from: https://github.com/digitalocean/doctl/releases
+```text
+http://127.0.0.1:5000/
 ```
 
-**Authenticate with DigitalOcean:**
-```bash
-# Get your API token from: https://cloud.digitalocean.com/account/api/tokens
-doctl auth init --access-token YOUR_DO_TOKEN_HERE
+## How to Reproduce the Pipeline
 
-# Verify authentication
-doctl account get
-```
-
-### Step 2: Create DigitalOcean Resources
-
-**Create Kubernetes Cluster (DOKS):**
-```bash
-# Create cluster with 2 nodes
-doctl kubernetes cluster create flask-app-cluster \
-    --region blr1 \
-    --version 1.33.1-do.1 \
-    --size s-2vcpu-4gb \
-    --node-pool "name=flask-app-nodes;count=2;size=s-2vcpu-4gb" \
-    --auto-upgrade=true \
-    --maintenance-window start=04:00,day=sunday
-
-# This takes about 5-10 minutes to provision
-```
-
-**Create Container Registry (DOCR):**
-```bash
-# Create container registry
-doctl registry create flask-app-container-registry --region blr1
-
-# Enable registry integration with your cluster
-doctl kubernetes cluster registry add flask-app-cluster flask-app-container-registry
-```
-
-**Configure kubectl:**
-```bash
-# Download cluster credentials
-doctl kubernetes cluster kubeconfig save flask-app-cluster
-
-# Verify cluster connection
-kubectl get nodes
-kubectl cluster-info
-```
-
-### Step 3: Configure GitHub Repository
-
-**Required GitHub Secrets:**
-
-Navigate to your GitHub repo → Settings → Secrets and variables → Actions, and add:
+The main reproducibility entry point is:
 
 ```bash
-# DigitalOcean secrets
-DO_TOKEN=your_digitalocean_api_token
-DO_REGISTRY=registry.digitalocean.com/flask-app-container-registry
-DO_CLUSTER_NAME=flask-app-cluster
-
-# AWS S3 secrets (for data storage)
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-
-# MLflow/DagsHub token
-CAPSTONE_TEST=your_dagshub_token
+dvc repro
 ```
 
-### Step 4: Deploy Application
+What this does in practice:
 
-**Manual Deployment (First Time):**
+- pulls raw scorecards from S3-compatible storage during ingestion
+- generates intermediate and processed datasets under `data/`
+- trains the model and saves `models/model.pkl`
+- evaluates the model and writes report artifacts
+- registers the model in MLflow as `my_model` with `stage=staging`
+
+Generated artifacts include:
+
+- `data/raw/data.csv`
+- `data/interim/interim_data.csv`
+- `data/processed/train_final.csv`
+- `data/processed/test_final.csv`
+- `eligible_cities.txt`
+- `flask_app/eligible_cities.txt`
+- `models/model.pkl`
+- `reports/metrics.json`
+- `reports/experiment_info.json`
+
+Important practical note: reproducibility here depends on external services and credentials. This is not a fully self-contained offline pipeline.
+
+## Environment Variables / Secrets Needed
+
+| Variable | Required for | Where it is used |
+| --- | --- | --- |
+| `AWS_ACCESS_KEY_ID` | Local pipeline runs | Raw data ingestion from S3-compatible storage |
+| `AWS_SECRET_ACCESS_KEY` | Local pipeline runs | Raw data ingestion from S3-compatible storage |
+| `CAPSTONE_TEST` | Local evaluation, registration, app runtime, tests, CI | DagsHub / MLflow authentication |
+| `DO_TOKEN` | CI/CD deployment only | Authenticate to DigitalOcean |
+| `DO_REGISTRY` | CI/CD deployment only | Push Docker image to DigitalOcean Container Registry |
+| `DO_CLUSTER_NAME` | CI/CD deployment only | Fetch kubeconfig and deploy to Kubernetes |
+
+Runtime note: the serving app only needs `CAPSTONE_TEST` at deployment time because model loading is registry-driven.
+
+## Example Usage
+
+### Browser form
+
+Start the app locally, open `/`, and enter:
+
+- batting team
+- bowling team
+- city
+- current score
+- overs done
+- wickets out
+- runs in the last 5 overs
+
+The app converts those values into training-compatible features and returns a rounded projected first-innings total.
+
+### JSON prediction request
+
 ```bash
-# Clone your repo
-git clone https://github.com/your-username/Cricket-T20-Score-Predictor-MLOps.git
-cd Cricket-T20-Score-Predictor-MLOps
-
-# Apply Kubernetes manifests
-kubectl apply -f deployment.yaml
-
-# Check deployment status
-kubectl get pods -l app=flask-app
-kubectl get services
-
-# Get external IP (may take a few minutes)
-kubectl get svc flask-app-service -w
+curl -X POST http://127.0.0.1:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batting_team": "India",
+    "bowling_team": "England",
+    "city": "London",
+    "current_score": 80,
+    "balls_left": 60,
+    "wickets_left": 6,
+    "crr": 8.0,
+    "last_five": 30
+  }'
 ```
 
-**Automatic Deployment via CI/CD:**
-- Simply push code to main branch
-- GitHub Actions will automatically test, build, and deploy
-- Monitor progress in Actions tab of your GitHub repo
+Response shape:
 
-### Step 5: Set Up Monitoring Stack
+```text
+{"predicted_score": <integer>}
+```
 
-**Install Helm (if not already installed):**
+### Metrics endpoint
+
 ```bash
-# macOS
-brew install helm
-
-# Windows
-choco install kubernetes-helm
-
-# Linux
-curl https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz | tar xz
-sudo mv linux-amd64/helm /usr/local/bin/
+curl http://127.0.0.1:5000/metrics
 ```
 
-**Deploy Prometheus & Grafana:**
-```bash
-# Add Prometheus Helm repository
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
+## Testing
 
-# Create monitoring namespace
-kubectl create namespace monitoring
+The repository includes two primary tests:
 
-# Install kube-prometheus-stack
-helm install prometheus prometheus-community/kube-prometheus-stack \
-    --namespace monitoring \
-    --set grafana.service.type=LoadBalancer \
-    --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.release=prometheus \
-    --set grafana.adminPassword=admin123 \
-    --wait
+| Test | Command | Notes |
+| --- | --- | --- |
+| Model test | `python -m unittest tests/test_model.py` | Loads the latest `stage=staging` model from MLflow/DagsHub and evaluates it against local processed test data |
+| Flask app test | `python -m unittest tests/test_flask_app.py` | Imports the Flask app, exercises `/` and `/predict`, and therefore still depends on registry access because the app loads a production-tagged model at import time |
 
-# Get Grafana external IP
-kubectl -n monitoring get svc prometheus-grafana -w
-```
+Practical testing notes:
 
-**Access Monitoring:**
-```bash
-# Get Grafana URL
-echo "Grafana: http://$(kubectl -n monitoring get svc prometheus-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}'):80"
+- `CAPSTONE_TEST` is required for both tests.
+- The model test expects generated pipeline outputs such as `data/processed/test_final.csv`.
+- These tests are integration-leaning rather than fully isolated unit tests.
 
-# Default login: admin / admin123
-# Import dashboard ID: 315 (Kubernetes Cluster Monitoring)
-```
+## Known Limitations / Current Caveats
 
-### Step 6: Useful Commands
+- The executable pipeline depends on external services: S3-compatible object storage for raw data and DagsHub / MLflow for tracking and registry access.
+- Generated outputs such as processed datasets and evaluation reports are not all committed to the repository by default.
+- `dvc.lock` reflects a previous successful run and may not match the current `params.yaml` exactly.
+- Team coverage is limited to a curated list of international sides defined in preprocessing.
+- City coverage is limited to cities that survive the volume threshold in feature engineering.
+- The monitoring stack is only partly codified in the repo; application metrics are implemented, but full Prometheus/Grafana infrastructure is described more in documentation and notes than in deployment manifests.
+- The serving container assumes a valid production-tagged model already exists in the MLflow registry and that credentials are available at runtime.
+- The project focuses only on men's T20 first-innings score prediction and does not extend to second-innings strategy, win prediction, or other formats.
 
-**Check Application Status:**
-```bash
-# View pods
-kubectl get pods -l app=flask-app
+## Future Improvements
 
-# View logs
-kubectl logs -l app=flask-app -f
+- Add stronger schema validation and input checks across ingestion and prediction paths.
+- Improve test isolation by introducing local fixtures or mocked registry/model-loading paths.
+- Expand feature engineering with richer venue, match-context, or recent-form signals.
+- Add more formal monitoring-as-code for Prometheus, Grafana, and alerting configuration.
+- Introduce data quality and drift monitoring around incoming inference traffic.
+- Decouple training and serving environments further so local setup can be lighter.
+- Broaden support for additional teams, cities, and possibly adjacent match formats.
 
-# Describe service
-kubectl describe svc flask-app-service
+## Conclusion
 
-# Scale deployment
-kubectl scale deployment flask-app --replicas=3
-```
-
-**Monitoring Commands:**
-```bash
-# Check Prometheus targets
-kubectl -n monitoring port-forward svc/prometheus-operated 9090:9090
-# Visit: http://localhost:9090/targets
-
-# Access Grafana locally
-kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80
-# Visit: http://localhost:3000
-```
-
-### Step 7: Cost Management & Cleanup
-
-**Monitor Costs:**
-- Check DigitalOcean billing dashboard regularly
-- DOKS cluster costs ~$24/month for 2 x 2vCPU nodes
-- LoadBalancer costs ~$12/month each
-- Container registry is free up to 5GB
-
-**Cleanup Resources (Important!):**
-```bash
-# Delete monitoring stack
-helm uninstall prometheus -n monitoring
-kubectl delete namespace monitoring
-
-# Delete application
-kubectl delete -f deployment.yaml
-
-# Delete cluster (THIS DELETES EVERYTHING!)
-doctl kubernetes cluster delete flask-app-cluster
-
-# Delete container registry
-doctl registry delete flask-app-container-registry
-
-# Verify cleanup
-doctl kubernetes cluster list
-doctl registry list
-```
-
-### Troubleshooting
-
-**Common Issues:**
-
-1. **Pods stuck in Pending:** Check node resources with `kubectl describe nodes`
-2. **ImagePullBackOff:** Verify DOCR integration with `kubectl get secrets`
-3. **Service no external IP:** Check LoadBalancer with `kubectl describe svc flask-app-service`
-4. **CI/CD fails:** Verify GitHub secrets are correctly set
-
-**Useful Debug Commands:**
-```bash
-# Check events
-kubectl get events --sort-by=.metadata.creationTimestamp
-
-# Debug pod issues
-kubectl describe pod <pod-name>
-kubectl logs <pod-name> --previous
-
-# Test connectivity
-kubectl run debug --image=busybox -it --rm -- /bin/sh
-```
-
-## Monitoring and Observability
-
-The project includes comprehensive monitoring:
-
-- **Prometheus Server**: Collects metrics from the API endpoints
-- **Grafana Dashboards**: Visualizes system and model performance
-- **Alerting Rules**: Notifications for anomalies and performance issues
-
-Access monitoring:
-- Prometheus: `http://<prometheus-server>:9090`
-- Grafana: `http://<grafana-server>:3000`
-
-## What I Learned
-
-Building this project taught me several important lessons about MLOps:
-
-1. **Automation is Critical**: Manual deployment processes are error-prone and don't scale
-2. **Monitoring is Essential**: You can't manage what you don't measure
-3. **Infrastructure as Code**: Version-controlled infrastructure prevents configuration drift
-4. **Data Versioning**: Just as important as code versioning for ML projects
-5. **Security**: Proper secret management and access controls are non-negotiable
-
-## Technical Specifications
-
-- **Model**: XGBoost Regressor with hyperparameter tuning
-- **API Framework**: Flask with Prometheus metrics integration
-- **Container Runtime**: Docker with Alpine Linux base
-- **Orchestration**: Kubernetes with rolling updates
-- **Storage**: S3-compatible object storage for artifacts
-- **Monitoring**: Prometheus + Grafana stack
-
-This project demonstrates that MLOps isn't just about deploying models - it's about building sustainable, scalable systems that can evolve with business needs while maintaining reliability and observability.
-
----
-1. LinkedIn: https://www.linkedin.com/in/srikarashankara/
-2. Email: srikarashankara@outlook.com
----
-*Built to showcase MLOps best practices with real-world applicability*
+This repository is a well-scoped, operationally aware MLOps project built around a clear cricket forecasting problem. It is strongest as an example of how a conventional ML model can be turned into a versioned, tracked, promoted, and deployable system with honest attention to reproducibility, serving, and observability.

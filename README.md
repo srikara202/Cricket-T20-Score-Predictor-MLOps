@@ -73,22 +73,22 @@ The project demonstrates a production-style ML lifecycle:
 
 ```mermaid
 flowchart LR
-    A[S3 bucket and prefix: t20s YAML scorecards] --> B[data_ingestion]
-    B --> C[data_preprocessing]
-    C --> D[feature_engineering]
-    D --> E[model_building]
-    E --> F[model_evaluation]
-    F --> G[model_registration]
-    G --> H[MLflow / DagsHub model registry]
-    H --> I[scripts/promote_model.py]
-    I --> J[production-tagged model version]
-    J --> K[Flask app]
-    K --> L[/predict]
-    K --> M[/metrics]
-    N[GitHub Actions on push] --> B
-    N --> O[Docker image build]
-    O --> P[DigitalOcean Container Registry]
-    P --> Q[Kubernetes deployment]
+    A["S3 bucket and prefix: t20s YAML scorecards"] --> B["data_ingestion"]
+    B --> C["data_preprocessing"]
+    C --> D["feature_engineering"]
+    D --> E["model_building"]
+    E --> F["model_evaluation"]
+    F --> G["model_registration"]
+    G --> H["MLflow / DagsHub model registry"]
+    H --> I["scripts/promote_model.py"]
+    I --> J["production-tagged model version"]
+    J --> K["Flask app"]
+    K --> L["/predict"]
+    K --> M["/metrics"]
+    N["GitHub Actions on push"] --> B
+    N --> O["Docker image build"]
+    O --> P["DigitalOcean Container Registry"]
+    P --> Q["Kubernetes deployment"]
     Q --> K
 ```
 

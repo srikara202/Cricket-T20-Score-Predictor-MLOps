@@ -71,25 +71,27 @@ The project demonstrates a production-style ML lifecycle:
 
 ## End-to-End Architecture / Pipeline Overview
 
-```mermaid
-flowchart LR
-    A["S3 bucket and prefix: t20s YAML scorecards"] --> B["data_ingestion"]
-    B --> C["data_preprocessing"]
-    C --> D["feature_engineering"]
-    D --> E["model_building"]
-    E --> F["model_evaluation"]
-    F --> G["model_registration"]
-    G --> H["MLflow / DagsHub model registry"]
-    H --> I["scripts/promote_model.py"]
-    I --> J["production-tagged model version"]
-    J --> K["Flask app"]
-    K --> L["/predict"]
-    K --> M["/metrics"]
-    N["GitHub Actions on push"] --> B
-    N --> O["Docker image build"]
-    O --> P["DigitalOcean Container Registry"]
-    P --> Q["Kubernetes deployment"]
-    Q --> K
+```text
+S3 bucket and prefix: t20s YAML scorecards
+  -> data_ingestion
+  -> data_preprocessing
+  -> feature_engineering
+  -> model_building
+  -> model_evaluation
+  -> model_registration
+  -> MLflow / DagsHub model registry
+  -> scripts/promote_model.py
+  -> production-tagged model version
+  -> Flask app
+     -> /predict
+     -> /metrics
+
+GitHub Actions on push
+  -> pipeline execution and tests
+  -> Docker image build
+  -> DigitalOcean Container Registry
+  -> Kubernetes deployment
+  -> Flask app
 ```
 
 At a high level:
